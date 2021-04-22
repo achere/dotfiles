@@ -19,10 +19,22 @@ export JAVA_HOME=$(readlink -f /usr/bin/java | sed "s:/bin/java::")
 # export SYSTEMD_PAGER=
 
 # User specific aliases and functions
+alias ungit='git reset HEAD@{1}'
 alias sfpush='sfdx force:source:push -u '
+alias sfpull='sfdx force:source:pull -u '
+alias sfopen='sfdx force:org:open -u '
 
 function sfdpl {
     sfdx force:source:deploy -u $1 -p $2
+}
+
+function sfrun {
+	sfdx force:apex:execute -f ~/anon.apex -u $1 | grep USER_DEBUG
+}
+
+function giff {
+    branch=$([[ -n "$1" ]] && echo "$1" || echo master);
+    git diff $branch... --name-only
 }
 
 # sfdx autocomplete setup
@@ -34,4 +46,3 @@ if [ -f "$HOME/.bash-git-prompt/gitprompt.sh" ]; then
     GIT_PROMPT_THEME=Single_line_Minimalist
     source $HOME/.bash-git-prompt/gitprompt.sh
 fi
-
