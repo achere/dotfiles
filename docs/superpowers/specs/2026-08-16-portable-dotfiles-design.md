@@ -67,6 +67,20 @@ folding (symlinking) the whole directory. This is the behavior we want:
 Had `~/.config/tmux` been folded, tpm would write plugins straight into the
 repo. Verify with `stow -n -v <pkg>` before every real `stow`.
 
+**This rule applies to all four packages, not just tmux.** Stow folds a
+directory only when the target directory does not already exist. So the
+invariant to preserve during migration is:
+
+> Remove the four migrated **files**. Never remove their parent
+> directories.
+
+`~/.config/lazygit` is the case where this bites hardest. Delete the
+directory rather than just `config.yml`, and stow will fold it — making
+`~/.config/lazygit` a symlink into the repo, so any file lazygit writes
+there lands in a **public** git repo. Lazygit's state currently goes to
+`~/Library/Application Support/lazygit/state.yml`, but that path is
+version- and XDG-dependent and is not something to rely on.
+
 ## zsh
 
 ### Split
@@ -97,13 +111,54 @@ its current position.
 | 26 | `$(brew --prefix)` → `$HOMEBREW_PREFIX` | same |
 | 28–31 | move `compinit` above the two plugin `source` lines | user request; upstream recommends loading fast-syntax-highlighting after `compinit` |
 | 35 | delete `alias kvi='NVIM_APPNAME="nvim-kickstart_mod" nvim'` | points at `~/.config/nvim-kickstart_mod`, out of scope, absent on a new machine |
+| 20 | `\. "$NVM_DIR/nvm.sh"` → `\. "$HOMEBREW_PREFIX/opt/nvm/nvm.sh"` | **fixes a silent fresh-machine failure**, see below |
+| 21 | `"$NVM_DIR/bash_completion"` → `"$HOMEBREW_PREFIX/opt/nvm/etc/bash_completion.d/nvm"` | current path does not exist — dead line today |
 | 39 | cert path → `"$HOMEBREW_PREFIX/etc/ca-certificates/cert.pem"` | verified identical file (same device:inode) — `/System/Volumes/Data/opt/homebrew` is the macOS firmlink for `/opt/homebrew` |
 | end | add `[ -f ~/.zshrc.local ] && source ~/.zshrc.local` | machine-local extension point |
 
 Untouched: `XDG_CONFIG_HOME`, the `bindkey` lines, `fzf`/`starship`/`zoxide`
-init, the NVM block (already `$HOME`-relative and guarded in the original),
-`KUBE_EDITOR`, `alias lg`, `ENABLE_LSP_TOOL`, and the entire vi-mode widget
-block.
+init, `export NVM_DIR`, `KUBE_EDITOR`, `alias lg`, `ENABLE_LSP_TOOL`, and the
+entire vi-mode widget block.
+
+#### NVM: the one genuine portability bug in the current file
+
+Lines 19–21 work on this machine by accident and would fail **silently** on
+a new one.
+
+Homebrew's `nvm` formula does not install into `~/.nvm`. Its caveats say to
+`mkdir ~/.nvm` and source from the opt path. What makes it work here is a
+symlink created by hand on **2023-11-15**:
+
+```
+~/.nvm/nvm.sh -> /opt/homebrew/opt/nvm/libexec/nvm.sh
+```
+
+On a fresh machine `brew install nvm` never creates that symlink, so
+`[ -s "$NVM_DIR/nvm.sh" ]` is false, the `&&` short-circuits, and nvm simply
+never loads. No error — `nvm` is just missing.
+
+Line 21 is worse: `~/.nvm/bash_completion` **does not exist on this machine
+either**, so nvm completion has never actually loaded. Verified by `ls`.
+Brew's real path is `$HOMEBREW_PREFIX/opt/nvm/etc/bash_completion.d/nvm`
+(2299 bytes, present).
+
+Corrected block, matching brew's own caveats:
+
+```zsh
+export NVM_DIR="$HOME/.nvm"
+[ -s "$HOMEBREW_PREFIX/opt/nvm/nvm.sh" ] && \. "$HOMEBREW_PREFIX/opt/nvm/nvm.sh"
+[ -s "$HOMEBREW_PREFIX/opt/nvm/etc/bash_completion.d/nvm" ] && \. "$HOMEBREW_PREFIX/opt/nvm/etc/bash_completion.d/nvm"
+```
+
+`NVM_DIR` stays `$HOME/.nvm` — brew's caveats warn that leaving it at the
+Cellar path destroys nvm-installed Node versions on upgrade. `bootstrap.sh`
+must therefore `mkdir -p "$HOME/.nvm"`.
+
+Note on the guard policy: these two `[ -s ]` guards are **pre-existing** in
+the user's file, not additions. Keeping them changes nothing about the
+rejected-failsafe decision — the fix is to the paths they test, not to the
+presence of the test. `~/.nvm/versions/node/` is currently empty, so no
+installed Node versions are at risk during migration.
 
 #### Why dropping `/opt/homebrew/bin` from line 1 is safe
 
@@ -314,6 +369,13 @@ removed. Roughly 39 further formulae (`gh`, `go`, `jq`, `terraform`,
 `ollama`, `heroku`, `bun`, `minikube`, …) and ~40 casks (`obsidian`,
 `dbeaver-community`, `discord`, `iterm2`, `vlc`, …).
 
+**Keep the `tap` lines that `brew bundle dump` emits.** This is a filtered
+dump, not a hand-written list — some entries are unreachable without their
+tap and would fail only on a fresh machine: `heroku` needs `heroku/brew`,
+`ntfs-3g-mac` needs `gromgit/fuse`. The core `Brewfile` needs no taps;
+verified that `font-fira-code-nerd-font` resolves to `homebrew/cask`, not
+the deprecated `homebrew/cask-fonts`.
+
 `bootstrap.sh` does **not** install this file. Install deliberately with
 `brew bundle install --file=Brewfile.extras`.
 
@@ -349,7 +411,10 @@ stow -v tmux wezterm zsh lazygit
 # 4. everything the configs depend on
 brew bundle install --file="$DOTFILES/Brewfile"
 
-# 5. tmux plugins install themselves on first `tmux` launch (see tmux above)
+# 5. NVM_DIR must exist; brew's nvm formula does not create it
+mkdir -p "$HOME/.nvm"
+
+# 6. tmux plugins install themselves on first `tmux` launch (see tmux above)
 ```
 
 `bootstrap.sh` is the only place the Apple Silicon brew path appears outside
@@ -389,12 +454,18 @@ Distinct from fresh-machine bootstrap. For each package: `git add` and
 commit the file into the repo **before** removing the original, then
 `stow -n -v` to preview, then `stow`.
 
+0. Set a repo-local git identity once —
+   `git -C ~/dotfiles config user.name/user.email`. The global `.gitconfig`
+   has both **commented out**, so commits otherwise fail or get attributed
+   to `achere@Alexanders-MacBook-Pro.local`.
 1. Copy `~/.zshrc`, `~/.config/tmux/tmux.conf`,
    `~/.config/wezterm/wezterm.lua`, `~/.config/lazygit/config.yml` into
    their package paths; apply the edits above.
 2. Commit.
 3. Back up lazygit (both locations) to a timestamped tarball.
-4. Remove the originals.
+4. Remove the four original **files** — not their parent directories. See
+   the folding rule above; deleting `~/.config/lazygit/` as a directory
+   would cause stow to fold it.
 5. `stow -n -v tmux wezterm zsh lazygit`, inspect, then `stow` for real.
 6. `brew install lazygit`.
 7. Verify.
@@ -408,6 +479,12 @@ Evidence, not assertion — each item has a command and an observable:
   ~/.config/lazygit/config.yml` — all four are symlinks into `~/dotfiles`.
 - A new zsh starts clean, no errors; `echo $HOMEBREW_PREFIX` is non-empty;
   `print -l $path | head -4` matches the table above.
+- `command -v nvm` reports `nvm` as a shell function, **and** `nvm --version`
+  succeeds. This is the check that would have caught the fresh-machine bug;
+  the old form fails it silently, so absence of an error proves nothing.
+- Stow created no folded directories:
+  `find ~/.config -maxdepth 1 -type l` returns nothing for `tmux`,
+  `wezterm`, or `lazygit`.
 - vi-mode still works: `j`/`k` move within a multi-line command, `Ctrl-P` /
   `Ctrl-N` reach history, a trailing `\` grows the buffer instead of
   submitting.
