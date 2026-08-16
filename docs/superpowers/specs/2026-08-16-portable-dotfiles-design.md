@@ -23,15 +23,18 @@ depend on.
   independent. Not a stow package, not a submodule, not cloned by
   `bootstrap.sh`. Clone it by hand when setting up a machine.
 - **cmux, ghostty, git configs** — considered and excluded.
+- **`~/.zprofile`** — excluded by explicit decision, not oversight. It is a
+  login-shell startup file containing only installer-generated,
+  machine-specific lines (a JetBrains Toolbox `PATH` entry with a hardcoded
+  `/Users/achere/`). Its MacPorts `PATH` block was removed as part of the
+  MacPorts teardown below. It stays uncommitted and machine-local.
 - **Defensive guards.** Explicitly rejected by the user: no `[ -f ]` guards
   before `source`, no `command -v` guards before `eval`, no multi-prefix
   Homebrew probe. The stated constraint is "I'm not going to try to run it
   with no brew." The one surviving `[ -f ]` is on `~/.zshrc.local`, which is
   structural — that file is *expected* not to exist on a fresh machine.
-- **MacPorts migration.** `port` is currently broken on this machine
-  (`Current platform "darwin 25" does not match expected platform
-  "darwin 23"`, wants `sudo port migrate`). We work around it rather than
-  fix it. See "lazygit" below.
+- **MacPorts migration.** Superseded — MacPorts is being *removed* rather
+  than migrated. See "lazygit" below.
 
 ## Repo layout
 
@@ -289,13 +292,31 @@ The binary is not: it is currently a **MacPorts** install at
 `/opt/local/bin/lazygit`, so a brew-only machine would get the config and no
 program.
 
-### Switch to Homebrew without uninstalling
+### Switch to Homebrew, then remove MacPorts entirely
 
-`port` cannot run at all right now (platform mismatch, see Scope). No
-migration is needed: `/opt/homebrew/bin` is PATH entry **#1** and
-`/opt/local/bin` is **#5**, so `brew install lazygit` (0.64.1) shadows the
-MacPorts binary immediately — no `sudo`, nothing removed. The orphaned
-MacPorts copy stays on disk, unreferenced.
+`port` cannot run at all (platform mismatch: `darwin 25` vs expected
+`darwin 23`). Migration was considered and rejected — it would rebuild
+lazygit 0.43.1, the exact package being replaced.
+
+The decisive fact: **MacPorts had exactly one package installed.**
+`/opt/local/var/macports/software/` contained only `lazygit`; of the seven
+binaries in `/opt/local/bin`, six were MacPorts' own machinery (`port`,
+`portf`, `portindex`, `portmirror`, `port-tclsh`, `daemondo`). Nothing else
+on the system depended on it.
+
+Order matters — brew's lazygit must be installed **before** MacPorts is
+removed, or there is a window with no lazygit at all:
+
+1. Back up both lazygit config locations to a timestamped tarball.
+2. `brew install lazygit` — 0.64.1 shadows MacPorts' 0.43.1 immediately
+   (`/opt/homebrew/bin` is PATH #1, `/opt/local/bin` was #5).
+3. Verify brew's binary resolves and parses the config.
+4. Remove the MacPorts `PATH` block from `~/.zprofile`.
+5. `sudo rm -rf /opt/local /var/db/receipts/org.macports.MacPorts.bom
+   /var/db/receipts/org.macports.MacPorts.plist` — the complete footprint;
+   `/Applications/MacPorts`, `/Library/Tcl/macports1.0`, and the MacPorts
+   LaunchDaemons plist were all verified absent. Frees ~555 MB.
+6. Re-verify lazygit.
 
 ### Backup first
 
@@ -311,9 +332,12 @@ Neither `brew install` nor any future `port uninstall` writes to either
 path, so risk is low — but tar both to a timestamped archive before
 touching anything, as requested.
 
-**Verification:** `command -v lazygit` resolves to `/opt/homebrew/bin`, and
-both custom commands (`b` bulk-delete gone branches, `F` fix worktree) still
-appear in the lazygit UI.
+**Verification.** `lazygit -c` prints the *default* config, not the merged
+one, so it proves nothing. The working check is `lazygit -ucf <file>` with a
+deliberately malformed YAML file as a control: the control must fail with a
+parse error while the real config gets past parsing. Plus `command -v
+lazygit` → `/opt/homebrew/bin/lazygit`, and both custom commands (`b`
+bulk-delete gone branches, `F` fix worktree) visible in the UI.
 
 ## Brewfile
 
