@@ -1,7 +1,10 @@
 # Portable dotfiles via GNU Stow — design
 
 **Date:** 2026-08-16
-**Status:** implemented — packages stowed and verified on this machine 2026-08-17
+**Status:** implemented 2026-08-17 — packages stowed and verified on this
+machine. Two items outstanding: `brew bundle check --file=Brewfile` does not
+pass (`git` is Apple's, not brew's; `fzf` is one patch behind), and the repo
+has no remote yet.
 
 ## Goal
 
