@@ -1,10 +1,17 @@
 # Portable dotfiles via GNU Stow — design
 
 **Date:** 2026-08-16
-**Status:** implemented 2026-08-17 — packages stowed and verified on this
-machine. Two items outstanding: `brew bundle check --file=Brewfile` does not
-pass (`git` is Apple's, not brew's; `fzf` is one patch behind), and the repo
-has no remote yet.
+**Status:** implemented 2026-08-17 — packages stowed, whole verification
+checklist passing on this machine. One item outstanding by choice: the repo
+has no remote yet, so the "single public git repo" half of the goal is not
+met until one is created.
+
+Closing `brew bundle check` needed two installs on this machine: `git` was
+Apple's `/usr/bin/git`, and `fzf` was one patch behind. Both are now brew's,
+so brew's git (2.55.0) shadows Apple's (2.50.1) in `PATH`. Note that an
+outdated-by-one-patch formula is enough to fail `brew bundle check`, so this
+checklist item goes red on its own as formulae drift — it is not a stable
+invariant.
 
 ## Goal
 
