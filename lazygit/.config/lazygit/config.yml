@@ -1,0 +1,15 @@
+customCommands:
+  - key: 'b'
+    command: "git branch -vv | grep ': gone]' | awk '{print $1}' | xargs git branch -D"
+    context: 'localBranches'
+    description: 'Bulk-delete "upstream gone" branches'
+    loadingText: 'Deleting gone branches...'
+    prompts:
+      - type: 'confirm'
+        title: 'Confirm bulk delete'
+        body: 'Are you sure you want to force-delete all "gone" branches?'
+  - key: 'F'
+    command: "git config --get remote.origin.fetch >/dev/null 2>&1 || git config --add remote.origin.fetch '+refs/heads/*:refs/remotes/origin/*'; git fetch origin"
+    context: 'global'
+    description: 'Fix worktree - ensure fetch config and fetch'
+    loadingText: 'Fixing worktree and fetching...'
