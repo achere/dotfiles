@@ -42,21 +42,13 @@ export NODE_EXTRA_CA_CERTS="$HOMEBREW_PREFIX/etc/ca-certificates/cert.pem"
 # Enable LSP tool for Claude Code
 export ENABLE_LSP_TOOL=1
 
-# ---------------------------------------------------------------------------
 # vi-mode: j/k move between lines of the command, never through history.
+# Keep LAST - must load after fzf/autosuggestions/fast-syntax-highlighting so
+# nothing else rebinds these keys.
 #
-# Keep this block LAST in .zshrc - it has to load after fzf/autosuggestions/
-# fast-syntax-highlighting so nothing rebinds these keys afterwards.
-#
-# Why the widget below is needed: zsh does NOT keep a `\`-continued command in
-# one edit buffer. Pressing Enter after a trailing `\` submits the line and
-# reopens a *fresh, single-line* buffer at the PS2 prompt. The earlier lines are
-# still on screen but no longer editable, so j/k had no lines to move between
-# and fell straight through to history. Keeping the whole command in one buffer
-# is what makes line-wise motion possible in the first place.
-
-# Enter: if the command is unfinished (ends in an odd number of backslashes),
-# grow the buffer by one line instead of submitting. Ctrl-J still force-submits.
+# Enter grows the buffer instead of submitting while a command ends in a
+# trailing `\`, since zsh would otherwise drop it into a fresh single-line
+# buffer with nothing left for j/k to move through. Ctrl-J still force-submits.
 accept-line-or-continue() {
   local trail=${BUFFER##*[^\\]}        # trailing run of backslashes
   local -i atend=0
