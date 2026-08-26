@@ -20,8 +20,8 @@ mkdir -p "$HOME/.config/tmux" "$HOME/.config/wezterm" "$HOME/.config/lazygit"
 
 # 4. link the packages
 cd "$DOTFILES"
-stow -n -v tmux wezterm zsh lazygit   # dry run first, always
-stow -v tmux wezterm zsh lazygit
+stow -n -v tmux wezterm zsh lazygit starship   # dry run first, always
+stow -v tmux wezterm zsh lazygit starship
 
 # 5. everything the configs depend on
 brew bundle install --file="$DOTFILES/Brewfile"
