@@ -35,6 +35,7 @@ source "$HOMEBREW_PREFIX/opt/zsh-fast-syntax-highlighting/share/zsh-fast-syntax-
 export KUBE_EDITOR='nvim' # Kubernetes editor
 
 alias lg='lazygit'
+alias k='kubectl'
 
 # Heroku CLI complains without this
 export NODE_EXTRA_CA_CERTS="$HOMEBREW_PREFIX/etc/ca-certificates/cert.pem"
