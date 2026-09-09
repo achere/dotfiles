@@ -209,6 +209,22 @@ copy_mode = "prefix+["
 # Unbind herdr's silent default and replace it with a popup that asks.
 close_pane = ""
 
+# herdr has no sidebar-specific border setting - the full [ui] key list has
+# nothing border-related besides these two, so this is the mechanism for a
+# dividing line against the workspace sidebar. The default pane_borders =
+# "auto" only frames *split* panes, so a workspace showing a single pane
+# gets no frame and therefore no line against the sidebar; "always" frames
+# a lone pane too, which is what produces the line. pane_outer_borders draws
+# the outside edge of the pane area - it's what that left-hand line actually
+# is - and already defaults to true, but "always" only takes effect while
+# it's enabled, so it's set here explicitly to record the dependency rather
+# than leave the behaviour resting on an unstated default. If the line
+# renders too dim, ui.accent is documented as the colour for "highlights,
+# borders, and navigation UI".
+[ui]
+pane_borders = "always"
+pane_outer_borders = true
+
 [ui.toast]
 # Ping the OS when a pi or claude pane finishes or needs input. Off by
 # default; this is what the agent integrations actually buy.
@@ -229,6 +245,12 @@ width = "50%"
 height = "20%"
 command = '''sh -c 'p=$(herdr api snapshot | jq -r .result.snapshot.focused_pane_id); c=$(herdr pane get "$p" | jq -r .result.pane.cwd); printf "Close pane %s (%s)? [y/N] " "$p" "$c"; read a; case "$a" in [yY]*) herdr pane close "$p" ;; esac' '''
 ```
+
+The `[ui]` block was added afterward, for a visible border between the
+sidebar and the pane area: herdr exposes no sidebar-border setting, so
+`pane_borders = "always"` plus `pane_outer_borders` is the mechanism —
+`"always"` frames a pane even when it isn't split, and the outer-border flag
+is what draws that frame's outside edge, the side facing the sidebar.
 
 ## Repo wiring
 
