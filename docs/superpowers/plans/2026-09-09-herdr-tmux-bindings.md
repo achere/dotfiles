@@ -54,14 +54,19 @@ onboarding = false
 
 [keys]
 # tmux does `unbind C-b; set -g prefix C-Space`. Same chord, so herdr and
-# tmux share a prefix: whichever one is nested inside the other never sees
-# it. Deliberate - the intent is to run one or the other, not both.
+# tmux share a prefix: the outer one swallows it unless pressed twice -
+# tmux.conf binds `C-Space send-prefix`, so a second press passes the chord
+# through to a nested herdr. Deliberate - the intent is to run one or the
+# other, not both.
 prefix = "ctrl+space"
 
 # tmux `"` splits stacked, `%` splits side by side. herdr names splits after
 # the divider, which inverts tmux's split-window -v/-h flags - these follow
 # the visual result, not the flag letter. `quote` is the double quote; the
-# apostrophe is not bindable.
+# apostrophe is not bindable. Unverified: this mapping is inferred from
+# herdr's default `-`/`v` mnemonic and its `pane split --direction
+# right|down` CLI, not from documentation or observation - if `prefix+"`
+# turns out to split side by side, swap the two values below.
 split_horizontal = "prefix+quote"
 split_vertical   = "prefix+percent"
 
@@ -71,10 +76,18 @@ close_tab  = "prefix+ampersand"  # tmux & kill-window
 
 # tmux s is choose-session, and a workspace is herdr's nearest equivalent.
 # Settings moves aside to make room.
-workspace_picker = "prefix+s"
+workspace_picker = "prefix+s"    # herdr's default prefix+w goes unbound
 settings         = "prefix+shift+s"
 
 last_pane = "prefix+semicolon"   # tmux ; last-pane; unset in herdr by default
+
+# tmux `prefix [` enters copy mode; herdr's copy mode has the same vi-style
+# motions built in. Easy to miss: this action is absent from herdr
+# --default-config output, which makes it look unsupported when it isn't.
+# Literal `[` is required here, not a named spelling, despite this file's
+# preference for named keys elsewhere: `bracketleft`, `leftbracket`,
+# `lbracket` and `openbracket` are all rejected as invalid keybindings.
+copy_mode = "prefix+["
 
 [ui.toast]
 # Ping the OS when a pi or claude pane finishes or needs input. Off by

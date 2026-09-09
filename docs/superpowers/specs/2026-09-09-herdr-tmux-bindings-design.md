@@ -1,8 +1,12 @@
 # herdr with tmux keybindings + pi/claude integrations — design
 
 **Date:** 2026-09-09
-**Status:** design approved; integrations already installed (see
-"Integrations"), config and repo wiring not yet written.
+**Status:** config, Brewfile/bootstrap wiring and zsh completions are
+implemented and committed (see "Config file" and "Repo wiring"). Both agent
+integrations are installed; `herdr integration status` reports `pi: current`
+and `claude: current`. Not yet done: the interactive verification — confirming
+split orientation and exercising the remaining changed keybindings — has not
+been performed.
 
 ## Goal
 
@@ -93,13 +97,18 @@ so these were confirmed rather than assumed:
 Prefer the named spellings over the literal punctuation — they avoid TOML
 quoting problems (`split_vertical = "prefix+"..."` is a parse error).
 
-### Known gap: no copy-mode
+### copy-mode: supported, but easy to miss
 
-herdr has no equivalent of tmux's `prefix [` with vi selection, `v` and `y`.
-Selection is mouse-driven via `mouse_capture` and `copy_on_select`, both on
-by default. The nearest thing to copy-mode is `prefix+e`, which dumps the
-pane scrollback into `$EDITOR`. This is not being worked around; it is
-recorded so the absence is not mistaken for a misconfiguration.
+herdr does have an equivalent of tmux's `prefix [`: `copy_mode` is a real
+action, bound here to `prefix+[` to match tmux, and herdr's copy mode has the
+same vi-style motions built in. This was missed on a first pass because
+`copy_mode` does not appear in `herdr --default-config` output — the action
+exists, but that command's listing doesn't surface it, which makes it look
+unsupported when it isn't.
+
+Selection is also mouse-driven, independently of copy mode: `mouse_capture`
+and `copy_on_select` are both on by default. `prefix+e`, which dumps the pane
+scrollback into `$EDITOR`, is a third, unrelated route to the same content.
 
 ## Config file
 
@@ -120,14 +129,19 @@ onboarding = false
 
 [keys]
 # tmux does `unbind C-b; set -g prefix C-Space`. Same chord, so herdr and
-# tmux share a prefix: whichever one is nested inside the other never sees
-# it. Deliberate - the intent is to run one or the other, not both.
+# tmux share a prefix: the outer one swallows it unless pressed twice -
+# tmux.conf binds `C-Space send-prefix`, so a second press passes the chord
+# through to a nested herdr. Deliberate - the intent is to run one or the
+# other, not both.
 prefix = "ctrl+space"
 
 # tmux `"` splits stacked, `%` splits side by side. herdr names splits after
 # the divider, which inverts tmux's split-window -v/-h flags - these follow
 # the visual result, not the flag letter. `quote` is the double quote; the
-# apostrophe is not bindable.
+# apostrophe is not bindable. Unverified: this mapping is inferred from
+# herdr's default `-`/`v` mnemonic and its `pane split --direction
+# right|down` CLI, not from documentation or observation - if `prefix+"`
+# turns out to split side by side, swap the two values below.
 split_horizontal = "prefix+quote"
 split_vertical   = "prefix+percent"
 
@@ -137,10 +151,18 @@ close_tab  = "prefix+ampersand"  # tmux & kill-window
 
 # tmux s is choose-session, and a workspace is herdr's nearest equivalent.
 # Settings moves aside to make room.
-workspace_picker = "prefix+s"
+workspace_picker = "prefix+s"    # herdr's default prefix+w goes unbound
 settings         = "prefix+shift+s"
 
 last_pane = "prefix+semicolon"   # tmux ; last-pane; unset in herdr by default
+
+# tmux `prefix [` enters copy mode; herdr's copy mode has the same vi-style
+# motions built in. Easy to miss: this action is absent from herdr
+# --default-config output, which makes it look unsupported when it isn't.
+# Literal `[` is required here, not a named spelling, despite this file's
+# preference for named keys elsewhere: `bracketleft`, `leftbracket`,
+# `lbracket` and `openbracket` are all rejected as invalid keybindings.
+copy_mode = "prefix+["
 
 [ui.toast]
 # Ping the OS when a pi or claude pane finishes or needs input. Off by
@@ -231,7 +253,7 @@ they are installed.
 2. `stow -n -v herdr` shows only `config.toml` being linked — no folded
    directory. This is the check that matters most.
 3. `herdr server reload-config`, then exercise each changed binding:
-   prefix, `"`, `%`, `d`, `,`, `&`, `s`, `;`.
+   prefix, `"`, `%`, `d`, `,`, `&`, `s`, `;`, `[`.
 4. **Confirm split orientation.** That `split_horizontal` stacks and
    `split_vertical` splits side by side is inferred from herdr's naming and
    its `pane split --direction right|down` CLI, not read from documentation.
