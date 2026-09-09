@@ -15,13 +15,16 @@ brew install stow
 #    symlinks the whole thing into the repo - only when the target does not
 #    already exist. A folded ~/.config/tmux would make tpm write plugins and
 #    multi-megabyte logs straight into version control, and a folded
-#    ~/.config/lazygit would put lazygit's state into a public repo.
-mkdir -p "$HOME/.config/tmux" "$HOME/.config/wezterm" "$HOME/.config/lazygit"
+#    ~/.config/lazygit would put lazygit's state into a public repo. The same
+#    applies to ~/.config/herdr, which holds herdr.sock, herdr-client.sock,
+#    session.json and .plugins.lock - live sockets and session state.
+mkdir -p "$HOME/.config/tmux" "$HOME/.config/wezterm" "$HOME/.config/lazygit" \
+         "$HOME/.config/herdr"
 
 # 4. link the packages
 cd "$DOTFILES"
-stow -n -v tmux wezterm zsh lazygit starship   # dry run first, always
-stow -v tmux wezterm zsh lazygit starship
+stow -n -v tmux wezterm zsh lazygit starship herdr   # dry run first, always
+stow -v tmux wezterm zsh lazygit starship herdr
 
 # 5. everything the configs depend on
 brew bundle install --file="$DOTFILES/Brewfile"
@@ -54,3 +57,15 @@ mkdir -p "$HOME/.nvm"
 
 # 8. tmux plugins: tmux.conf clones tpm itself on first launch. If the
 #    plugins do not appear, press prefix + I once.
+
+# 9. herdr's agent integrations report pi/claude lifecycle state to the herdr
+#    sidebar and OS notifications. They are not symlinked: both write into
+#    gitignored machine-local directories, and claude's install also appends a
+#    hooks key to ~/.claude/settings.json. Both commands exit 1 when the target
+#    directory is missing ("install pi first"), which would abort this script
+#    under `set -e` on a machine where neither agent has been run yet - hence
+#    the mkdir, which makes them succeed unconditionally and keeps this file
+#    free of `command -v` guards.
+mkdir -p "$HOME/.claude" "$HOME/.pi/agent/extensions"
+herdr integration install pi
+herdr integration install claude

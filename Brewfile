@@ -15,6 +15,7 @@ brew "tmux"                         # tmux.conf
 brew "git"                          # tpm auto-clone + cloning this repo
 brew "stow"                         # bootstrap
 brew "go"                           # nvim go tooling; see bootstrap step 6
+brew "herdr"                        # herdr/.config/herdr/config.toml
 
 # --- explicitly requested ---
 brew "ripgrep"
