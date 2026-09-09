@@ -1,0 +1,40 @@
+# herdr - terminal workspace manager for AI coding agents.
+#
+# Keybindings mirror tmux/.config/tmux/tmux.conf so muscle memory carries
+# over. Only bindings that CONTRADICT tmux are set here; herdr's defaults
+# already match tmux for h/j/k/l, z, x, c, n, p, 1-9 and ?, and
+# new_cwd = "follow" already reproduces tmux's `-c "#{pane_current_path}"`.
+#
+# Vocabulary: a herdr *workspace* is a tmux session, a herdr *tab* is a tmux
+# window, panes are panes.
+
+onboarding = false
+
+[keys]
+# tmux does `unbind C-b; set -g prefix C-Space`. Same chord, so herdr and
+# tmux share a prefix: whichever one is nested inside the other never sees
+# it. Deliberate - the intent is to run one or the other, not both.
+prefix = "ctrl+space"
+
+# tmux `"` splits stacked, `%` splits side by side. herdr names splits after
+# the divider, which inverts tmux's split-window -v/-h flags - these follow
+# the visual result, not the flag letter. `quote` is the double quote; the
+# apostrophe is not bindable.
+split_horizontal = "prefix+quote"
+split_vertical   = "prefix+percent"
+
+detach     = "prefix+d"          # tmux d; herdr's default prefix+q goes unbound
+rename_tab = "prefix+comma"      # tmux , rename-window
+close_tab  = "prefix+ampersand"  # tmux & kill-window
+
+# tmux s is choose-session, and a workspace is herdr's nearest equivalent.
+# Settings moves aside to make room.
+workspace_picker = "prefix+s"
+settings         = "prefix+shift+s"
+
+last_pane = "prefix+semicolon"   # tmux ; last-pane; unset in herdr by default
+
+[ui.toast]
+# Ping the OS when a pi or claude pane finishes or needs input. Off by
+# default; this is what the agent integrations actually buy.
+delivery = "system"
