@@ -165,7 +165,7 @@ Deliberately absent:
 ## Brewfile.extras
 
 Produced by `brew bundle dump` with everything in the core `Brewfile`
-removed. Roughly 39 further formulae (`gh`, `go`, `jq`, `terraform`,
+removed. Roughly 39 further formulae (`gh`, `jq`, `terraform`,
 `ollama`, `heroku`, `bun`, `minikube`, …) and ~40 casks (`obsidian`,
 `dbeaver-community`, `discord`, `iterm2`, `vlc`, …).
 
@@ -189,7 +189,8 @@ excluded: this file is scoped to formulae and casks, and
 `code` CLI that the Brewfile does not install. Regenerate with them by
 dropping the `vscode` filter if that changes.
 
-Actual counts as generated: 4 taps, 47 formulae, 38 casks. `git`,
+Actual counts as generated: 4 taps, 47 formulae, 38 casks; now 45 formulae
+after `tpm` and `go` were promoted out of this file. `git`,
 `ca-certificates`, and `kubernetes-cli` are in the core `Brewfile` but absent
 from the dump because they are installed as dependencies rather than as
 leaves — `brew bundle dump` lists only leaves. They are correctly declared in
@@ -337,8 +338,11 @@ is caused by the migration itself:
 
 ## Open assumptions
 
-- "and go" in the approval was read as the go-ahead, not a request to add
-  the Go toolchain. `go` remains in `Brewfile.extras`.
+- ~~"and go" in the approval was read as the go-ahead, not a request to add
+  the Go toolchain. `go` remains in `Brewfile.extras`.~~ **Superseded:** `go`
+  moved to the core `Brewfile`, because nvim's gopher.nvim needs a Go
+  toolchain to build `iferr`, `impl` and `json2go` — none of which exist as
+  Homebrew formulae. bootstrap.sh installs those tools directly.
 - Target machines are Apple Silicon Macs (justifies the hardcoded prefix).
 - tpm's auto-clone branch was verified to fire and clone tpm correctly in an
   isolated `HOME` — that covers the `if-shell` quoting, which is the part

@@ -14,6 +14,7 @@ brew "zsh-fast-syntax-highlighting"
 brew "tmux"                         # tmux.conf
 brew "git"                          # tpm auto-clone + cloning this repo
 brew "stow"                         # bootstrap
+brew "go"                           # nvim go tooling; see bootstrap step 6
 
 # --- explicitly requested ---
 brew "ripgrep"
