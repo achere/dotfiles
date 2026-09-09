@@ -18,14 +18,15 @@ onboarding = false
 # other, not both.
 prefix = "ctrl+space"
 
-# tmux `"` splits stacked, `%` splits side by side. herdr names splits after
-# the divider, which inverts tmux's split-window -v/-h flags - these follow
-# the visual result, not the flag letter. `quote` is the double quote; the
-# apostrophe is not bindable. Unverified: this mapping is inferred from
-# herdr's default `-`/`v` mnemonic and its `pane split --direction
-# right|down` CLI, not from documentation or observation - if `prefix+"`
-# turns out to split side by side, swap the two values below.
-split_horizontal = "prefix+quote"
+# tmux `"` splits stacked, `%` splits side by side. Confirmed by observation:
+# prefix+percent (split_vertical) produces the side-by-side split, so
+# herdr's vertical/horizontal naming does invert tmux's split-window -v/-h
+# flags, as suspected - split_horizontal therefore produces the stacked
+# split, matching tmux's `"`. herdr's `quote` names the apostrophe `'`, not
+# `"`, so the literal double-quote is required here. Lesson: `herdr config
+# check` only validates that a key name parses - it does not prove which
+# physical key it matches. Only pressing the key does.
+split_horizontal = 'prefix+"'
 split_vertical   = "prefix+percent"
 
 detach     = "prefix+d"          # tmux d; herdr's default prefix+q goes unbound
@@ -42,9 +43,9 @@ last_pane = "prefix+semicolon"   # tmux ; last-pane; unset in herdr by default
 # tmux `prefix [` enters copy mode; herdr's copy mode has the same vi-style
 # motions built in. Easy to miss: this action is absent from herdr
 # --default-config output, which makes it look unsupported when it isn't.
-# Literal `[` is required here, not a named spelling, despite this file's
-# preference for named keys elsewhere: `bracketleft`, `leftbracket`,
-# `lbracket` and `openbracket` are all rejected as invalid keybindings.
+# Literal `[` is required here, as with split_horizontal's `"` above:
+# `bracketleft`, `leftbracket`, `lbracket` and `openbracket` are all
+# rejected as invalid keybindings - named spellings don't cover every key.
 copy_mode = "prefix+["
 
 [ui.toast]

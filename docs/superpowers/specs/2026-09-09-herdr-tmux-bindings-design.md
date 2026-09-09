@@ -35,11 +35,19 @@ small enough to abandon cheaply.
 
 ### The prefix collision is deliberate
 
-herdr and tmux now share `ctrl+space`. Whichever is nested inside the other
-never sees the prefix. This is acceptable because the intent is to run one
-*or* the other, not both at once. If that changes, the fix is one line —
-`prefix` in `config.toml`. `herdr config check` validates key names, so a bad
-value is caught immediately rather than silently disabling the binding.
+herdr and tmux now share `ctrl+space`. The outer one swallows it unless
+pressed twice — `tmux.conf` binds `C-Space send-prefix`, so a second press
+passes the chord through to a nested herdr. This is acceptable because the
+intent is to run one *or* the other, not both at once. If that changes, the
+fix is one line — `prefix` in `config.toml`.
+
+`herdr config check` only validates that a key name *parses*. It does not
+catch a binding that collides with another action's default — `detach =
+"prefix+z"` against the default `zoom = "prefix+z"` still returns `config:
+ok` — and it does not prove a name matches the physical key it appears to:
+`quote` parses, but interactive testing showed it binds `'`, not `"` (see
+"Key-name syntax" below). Only pressing a binding confirms it does what its
+name suggests.
 
 ## Vocabulary
 
@@ -88,14 +96,22 @@ equivalent, so there is no muscle memory to honour: `prefix+b` sidebar,
 ignoring key`) and key names (`invalid keybinding: ...; disabling binding`),
 so these were confirmed rather than assumed:
 
-- `quote` is `"`, not `'`. `prefix+"` also parses; `prefix+'`,
-  `prefix+doublequote` and `prefix+apostrophe` are all rejected. The
-  apostrophe appears not to be bindable at all.
+- `quote` parses — but interactive testing showed it names the apostrophe
+  `'`, not `"` as the word suggests. `prefix+"` also parses, and is the
+  binding that actually produces the double-quote chord. `prefix+'`,
+  `prefix+doublequote` and `prefix+apostrophe` are all rejected by the
+  parser, even though `'` is the physical key `quote` matches — parsing and
+  matching are different guarantees; see "The prefix collision is
+  deliberate" above.
 - `percent` is `%`. `prefix+%` and `prefix+shift+5` also parse.
 - `ctrl+space`, `comma`, `ampersand`, `semicolon`, `minus` all parse.
 
-Prefer the named spellings over the literal punctuation — they avoid TOML
-quoting problems (`split_vertical = "prefix+"..."` is a parse error).
+Neither form is inherently safer: both named spellings and literal
+punctuation parse fine and both bind real keys, but a name parsing
+successfully says nothing about which physical key it matches — only
+pressing it does. Literal punctuation at least states the intended key
+outright; use a TOML literal string (`'prefix+"'`) when the character would
+otherwise need escaping.
 
 ### copy-mode: supported, but easy to miss
 
@@ -135,14 +151,15 @@ onboarding = false
 # other, not both.
 prefix = "ctrl+space"
 
-# tmux `"` splits stacked, `%` splits side by side. herdr names splits after
-# the divider, which inverts tmux's split-window -v/-h flags - these follow
-# the visual result, not the flag letter. `quote` is the double quote; the
-# apostrophe is not bindable. Unverified: this mapping is inferred from
-# herdr's default `-`/`v` mnemonic and its `pane split --direction
-# right|down` CLI, not from documentation or observation - if `prefix+"`
-# turns out to split side by side, swap the two values below.
-split_horizontal = "prefix+quote"
+# tmux `"` splits stacked, `%` splits side by side. Confirmed by observation:
+# prefix+percent (split_vertical) produces the side-by-side split, so
+# herdr's vertical/horizontal naming does invert tmux's split-window -v/-h
+# flags, as suspected - split_horizontal therefore produces the stacked
+# split, matching tmux's `"`. herdr's `quote` names the apostrophe `'`, not
+# `"`, so the literal double-quote is required here. Lesson: `herdr config
+# check` only validates that a key name parses - it does not prove which
+# physical key it matches. Only pressing the key does.
+split_horizontal = 'prefix+"'
 split_vertical   = "prefix+percent"
 
 detach     = "prefix+d"          # tmux d; herdr's default prefix+q goes unbound
@@ -159,9 +176,9 @@ last_pane = "prefix+semicolon"   # tmux ; last-pane; unset in herdr by default
 # tmux `prefix [` enters copy mode; herdr's copy mode has the same vi-style
 # motions built in. Easy to miss: this action is absent from herdr
 # --default-config output, which makes it look unsupported when it isn't.
-# Literal `[` is required here, not a named spelling, despite this file's
-# preference for named keys elsewhere: `bracketleft`, `leftbracket`,
-# `lbracket` and `openbracket` are all rejected as invalid keybindings.
+# Literal `[` is required here, as with split_horizontal's `"` above:
+# `bracketleft`, `leftbracket`, `lbracket` and `openbracket` are all
+# rejected as invalid keybindings - named spellings don't cover every key.
 copy_mode = "prefix+["
 
 [ui.toast]
