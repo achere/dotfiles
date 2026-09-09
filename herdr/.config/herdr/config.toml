@@ -84,10 +84,13 @@ delivery = "system"
 # echoes that id and its cwd: if the popup is ever slow to update focus and
 # this resolves to a pane other than the one the user meant to close, that
 # mismatch is visible in the prompt and declinable, instead of silently
-# closing the wrong pane.
+# closing the wrong pane. Runs under `bash`, not `sh`: `read -n 1` accepts a
+# single keypress without waiting for Enter, and that flag is a bashism -
+# `sh -c` would not support it. Only `y`/`Y` closes the pane; `n`, `q`, and a
+# bare Enter (empty input) all fall through to the default and decline.
 [[keys.command]]
 key = "prefix+x"
 type = "popup"
 width = "50%"
 height = "20%"
-command = '''sh -c 'p=$(herdr api snapshot | jq -r .result.snapshot.focused_pane_id); c=$(herdr pane get "$p" | jq -r .result.pane.cwd); printf "Close pane %s (%s)? [y/N] " "$p" "$c"; read a; case "$a" in [yY]*) herdr pane close "$p" ;; esac' '''
+command = '''bash -c 'p=$(herdr api snapshot | jq -r .result.snapshot.focused_pane_id); c=$(herdr pane get "$p" | jq -r .result.pane.cwd); printf "Close pane %s (%s)? [y/N] " "$p" "$c"; read -n 1 -r a; echo; case "$a" in [yY]) herdr pane close "$p" ;; esac' '''
