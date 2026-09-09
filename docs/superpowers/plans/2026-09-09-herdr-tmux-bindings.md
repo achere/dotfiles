@@ -1,0 +1,403 @@
+# herdr with tmux keybindings — Implementation Plan
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+
+**Goal:** Make `herdr` usable with the tmux muscle memory already encoded in `tmux/.config/tmux/tmux.conf`, managed reproducibly from this repo under the existing stow convention.
+
+**Architecture:** One new stow package (`herdr/.config/herdr/config.toml`) holding only the bindings that contradict herdr's defaults, plus wiring in `Brewfile`, `bootstrap.sh` and `zsh/.zshrc`. The pi and claude integrations are installed by command, not by symlink, because they write into gitignored machine-local directories.
+
+**Tech Stack:** GNU Stow, Homebrew Bundle, TOML, zsh, herdr 0.9.0.
+
+**Spec:** `docs/superpowers/specs/2026-09-09-herdr-tmux-bindings-design.md`
+
+## Global Constraints
+
+- **No defensive guards.** No `[ -f ]` before `source`, no `command -v` before `eval`, no `|| true`. Established in the 2026-08-16 spec and reaffirmed here. Where a command would fail on a fresh machine, fix the precondition with an unconditional `mkdir -p` instead.
+- **Never let stow fold a directory.** `~/.config/herdr` must exist before `stow` runs so stow descends into it and links only `config.toml`. Folding would put `herdr.sock`, `herdr-client.sock`, `session.json` and `.plugins.lock` into a public repo.
+- **Repo lives at `~/dotfiles`**, so stow's default target is `$HOME`. Never pass `-t`.
+- **`stow -n -v` dry run before every real `stow`.**
+- Comments in config files explain *why*, matching the density of the surrounding files.
+- Branch is `herdr-tmux-bindings`. The spec is already committed there as `f5066ea`.
+
+---
+
+### Task 1: The herdr stow package
+
+**Files:**
+- Create: `herdr/.config/herdr/config.toml`
+- Migrate: `~/.config/herdr/config.toml` (currently a real file containing `onboarding = false`; must be moved aside before stow can link)
+
+**Interfaces:**
+- Consumes: nothing.
+- Produces: `~/.config/herdr/config.toml` as a symlink into the repo. Task 2 adds the bootstrap lines that reproduce this on a new machine.
+
+- [ ] **Step 1: Create the package file**
+
+```bash
+mkdir -p ~/dotfiles/herdr/.config/herdr
+```
+
+Write `herdr/.config/herdr/config.toml` with exactly this content:
+
+```toml
+# herdr - terminal workspace manager for AI coding agents.
+#
+# Keybindings mirror tmux/.config/tmux/tmux.conf so muscle memory carries
+# over. Only bindings that CONTRADICT tmux are set here; herdr's defaults
+# already match tmux for h/j/k/l, z, x, c, n, p, 1-9 and ?, and
+# new_cwd = "follow" already reproduces tmux's `-c "#{pane_current_path}"`.
+#
+# Vocabulary: a herdr *workspace* is a tmux session, a herdr *tab* is a tmux
+# window, panes are panes.
+
+onboarding = false
+
+[keys]
+# tmux does `unbind C-b; set -g prefix C-Space`. Same chord, so herdr and
+# tmux share a prefix: whichever one is nested inside the other never sees
+# it. Deliberate - the intent is to run one or the other, not both.
+prefix = "ctrl+space"
+
+# tmux `"` splits stacked, `%` splits side by side. herdr names splits after
+# the divider, which inverts tmux's split-window -v/-h flags - these follow
+# the visual result, not the flag letter. `quote` is the double quote; the
+# apostrophe is not bindable.
+split_horizontal = "prefix+quote"
+split_vertical   = "prefix+percent"
+
+detach     = "prefix+d"          # tmux d; herdr's default prefix+q goes unbound
+rename_tab = "prefix+comma"      # tmux , rename-window
+close_tab  = "prefix+ampersand"  # tmux & kill-window
+
+# tmux s is choose-session, and a workspace is herdr's nearest equivalent.
+# Settings moves aside to make room.
+workspace_picker = "prefix+s"
+settings         = "prefix+shift+s"
+
+last_pane = "prefix+semicolon"   # tmux ; last-pane; unset in herdr by default
+
+[ui.toast]
+# Ping the OS when a pi or claude pane finishes or needs input. Off by
+# default; this is what the agent integrations actually buy.
+delivery = "system"
+```
+
+- [ ] **Step 2: Prove the migration is needed (the failing check)**
+
+Run: `cd ~/dotfiles && stow -n -v herdr`
+
+Expected: FAILURE — stow reports an existing target, e.g.
+`WARNING! stowing herdr would cause conflicts: * existing target is neither a link nor a directory: .config/herdr/config.toml`
+
+This confirms the live file must be moved before linking. If stow instead reports success, the live file is already gone — skip to Step 4.
+
+- [ ] **Step 3: Move the live config aside**
+
+```bash
+mv ~/.config/herdr/config.toml ~/.config/herdr/config.toml.pre-stow.bak
+```
+
+Do **not** remove `~/.config/herdr` itself. Removing the directory would make stow fold it, which is the failure this plan exists to prevent.
+
+- [ ] **Step 4: Re-run the dry run and read it carefully**
+
+Run: `cd ~/dotfiles && stow -n -v herdr`
+
+Expected: PASS, and the output must show a link being made for the **file**, not the directory:
+`LINK: .config/herdr/config.toml => ../../dotfiles/herdr/.config/herdr/config.toml`
+
+If the output instead says `LINK: .config/herdr => ...`, stop — the directory is being folded. Recreate `~/.config/herdr` and retry.
+
+- [ ] **Step 5: Link it**
+
+```bash
+cd ~/dotfiles && stow -v herdr
+```
+
+- [ ] **Step 6: Verify the link and validate the config**
+
+```bash
+ls -l ~/.config/herdr/config.toml
+herdr config check
+```
+
+Expected: `config.toml` is a symlink into `~/dotfiles/herdr/`, and `herdr config check` prints no `issues found`, no `invalid keybinding`, and no `unknown config key`.
+
+`herdr config check` validates both action names and key names, so any typo in the TOML above surfaces here rather than silently disabling a binding.
+
+- [ ] **Step 7: Apply to the running server**
+
+```bash
+herdr server reload-config
+```
+
+A herdr server is already running; without this the new bindings only take effect on the next server start.
+
+- [ ] **Step 8: Commit**
+
+```bash
+cd ~/dotfiles
+git add herdr/.config/herdr/config.toml
+git commit -m "Add herdr stow package with tmux-mapped keybindings"
+```
+
+---
+
+### Task 2: Brewfile and bootstrap wiring
+
+**Files:**
+- Modify: `Brewfile:14-17` (the *referenced by the other configs* block)
+- Modify: `bootstrap.sh:14-19` (step 3 comment and `mkdir -p`)
+- Modify: `bootstrap.sh:23-24` (both stow lines)
+- Modify: `bootstrap.sh:55-57` (append a new step 9 after the step 8 comment block)
+
+**Interfaces:**
+- Consumes: the `herdr` package directory created in Task 1.
+- Produces: a `bootstrap.sh` that reproduces Task 1's result plus both agent integrations on a fresh machine.
+
+- [ ] **Step 1: Add herdr to the Brewfile**
+
+In `Brewfile`, under `# --- referenced by the other configs ---`, add after the `brew "go"` line:
+
+```ruby
+brew "herdr"                        # herdr/.config/herdr/config.toml
+```
+
+Do **not** add `pi-coding-agent` or `claude-code`. They are the agents herdr manages, not dependencies of these configs, and the Brewfile is curated as one line per thing these dotfiles actually need.
+
+- [ ] **Step 2: Add ~/.config/herdr to the pre-stow mkdir**
+
+In `bootstrap.sh`, extend the step 3 comment block (currently lines 14-18) and its `mkdir -p` (line 19). Replace:
+
+```sh
+#    ~/.config/lazygit would put lazygit's state into a public repo.
+mkdir -p "$HOME/.config/tmux" "$HOME/.config/wezterm" "$HOME/.config/lazygit"
+```
+
+with:
+
+```sh
+#    ~/.config/lazygit would put lazygit's state into a public repo. The same
+#    applies to ~/.config/herdr, which holds herdr.sock, herdr-client.sock,
+#    session.json and .plugins.lock - live sockets and session state.
+mkdir -p "$HOME/.config/tmux" "$HOME/.config/wezterm" "$HOME/.config/lazygit" \
+         "$HOME/.config/herdr"
+```
+
+- [ ] **Step 3: Add herdr to both stow lines**
+
+In `bootstrap.sh`, replace lines 23-24:
+
+```sh
+stow -n -v tmux wezterm zsh lazygit starship   # dry run first, always
+stow -v tmux wezterm zsh lazygit starship
+```
+
+with:
+
+```sh
+stow -n -v tmux wezterm zsh lazygit starship herdr   # dry run first, always
+stow -v tmux wezterm zsh lazygit starship herdr
+```
+
+Note the ordering constraint this creates: stow must run before herdr is first launched on a new machine, because herdr writes its own `config.toml` on first run and stow refuses to link over a real file. bootstrap already satisfies this — step 4 stows, and nothing launches herdr.
+
+- [ ] **Step 4: Add the integrations step**
+
+Append to the end of `bootstrap.sh`, after the existing step 8 comment:
+
+```sh
+
+# 9. herdr's agent integrations report pi/claude lifecycle state to the herdr
+#    sidebar and OS notifications. They are not symlinked: both write into
+#    gitignored machine-local directories, and claude's install also appends a
+#    hooks key to ~/.claude/settings.json. Both commands exit 1 when the target
+#    directory is missing ("install pi first"), which would abort this script
+#    under `set -e` on a machine where neither agent has been run yet - hence
+#    the mkdir, which makes them succeed unconditionally and keeps this file
+#    free of `command -v` guards.
+mkdir -p "$HOME/.claude" "$HOME/.pi/agent/extensions"
+herdr integration install pi
+herdr integration install claude
+```
+
+- [ ] **Step 5: Syntax-check the script**
+
+Run: `bash -n ~/dotfiles/bootstrap.sh`
+
+Expected: PASS, no output. This catches the line-continuation backslash in Step 2 being malformed.
+
+- [ ] **Step 6: Verify the Brewfile resolves**
+
+Run: `cd ~/dotfiles && brew bundle check --file=Brewfile --verbose`
+
+Expected: either `The Brewfile's dependencies are satisfied.` or a list naming only formulae unrelated to this change. `herdr` must **not** appear as missing — it is already installed at 0.9.0.
+
+Per the 2026-08-16 spec, this check goes red on its own as formulae drift a patch behind, so a failure naming only other packages is not a regression from this task.
+
+- [ ] **Step 7: Verify the stow line is idempotent**
+
+Run: `cd ~/dotfiles && stow -n -v tmux wezterm zsh lazygit starship herdr`
+
+Expected: PASS with no conflicts. Task 1 already linked `herdr`, so re-stowing must be a no-op rather than an error.
+
+- [ ] **Step 8: Commit**
+
+```bash
+cd ~/dotfiles
+git add Brewfile bootstrap.sh
+git commit -m "Bootstrap herdr: brew formula, pre-stow mkdir, agent integrations"
+```
+
+---
+
+### Task 3: zsh completions
+
+**Files:**
+- Modify: `zsh/.zshrc:29`
+
+**Interfaces:**
+- Consumes: `brew "herdr"` from Task 2, which puts `herdr` on `PATH`.
+- Produces: `herdr <TAB>` subcommand completion in new shells.
+
+- [ ] **Step 1: Add the completion line**
+
+In `zsh/.zshrc`, replace line 29:
+
+```sh
+source <(kubectl completion zsh)
+```
+
+with:
+
+```sh
+source <(kubectl completion zsh)
+source <(herdr completion zsh)
+```
+
+Unguarded, matching the kubectl line directly above it and the repo's rejection of defensive guards. It must stay below `compinit` (line 20) — the same constraint the nvm block documents.
+
+- [ ] **Step 2: Verify the completion script is valid zsh**
+
+Run: `herdr completion zsh | zsh -n`
+
+Expected: PASS, no output. This checks the generated script parses before it is sourced into every future shell — a broken one would print errors on every shell start.
+
+- [ ] **Step 3: Verify it loads in a real shell**
+
+Run: `zsh -i -c 'echo ok' 2>&1 | tail -5`
+
+Expected: `ok`, with no errors mentioning `herdr` or `compdef`.
+
+- [ ] **Step 4: Commit**
+
+```bash
+cd ~/dotfiles
+git add zsh/.zshrc
+git commit -m "Load herdr zsh completions"
+```
+
+---
+
+### Task 4: Verify the bindings, and fix split orientation if inverted
+
+**Files:**
+- Possibly modify: `herdr/.config/herdr/config.toml` (only if Step 2 shows the splits are backwards)
+- Modify: `docs/superpowers/specs/2026-09-09-herdr-tmux-bindings-design.md` (Status line)
+
+**Interfaces:**
+- Consumes: everything from Tasks 1-3.
+- Produces: a verified configuration and an accurate spec Status line.
+
+This task is mostly interactive — it requires a human at a terminal pressing keys. Do not mark steps complete without actually running herdr.
+
+- [ ] **Step 1: Try to resolve split orientation without guessing**
+
+Run: `herdr api --help` and look for a keymap or action-metadata subcommand that reports what `split_horizontal` does.
+
+If one exists, use it. If not, fall through to Step 2. This step exists because the orientation is the one claim in the spec that was inferred from herdr's naming and its `pane split --direction right|down` CLI rather than read from documentation.
+
+- [ ] **Step 2: Confirm orientation by pressing the keys**
+
+Launch `herdr`, then press `ctrl+space` followed by `"`.
+
+Expected: the pane splits **stacked** (new pane below), matching tmux's `"`.
+
+Then press `ctrl+space` followed by `%`.
+
+Expected: the pane splits **side by side** (new pane to the right), matching tmux's `%`.
+
+- [ ] **Step 3: Swap the values only if Step 2 was inverted**
+
+If `"` split side by side and `%` split stacked, swap the two values in `herdr/.config/herdr/config.toml`:
+
+```toml
+split_horizontal = "prefix+percent"
+split_vertical   = "prefix+quote"
+```
+
+Then update the comment directly above them, which currently claims herdr's naming inverts tmux's flags, to state the observed behaviour instead. Run `herdr server reload-config` and repeat Step 2.
+
+If Step 2 passed, skip this step and change nothing.
+
+- [ ] **Step 4: Exercise the remaining changed bindings**
+
+With herdr running, confirm each of these does what tmux does:
+
+| Press | Expected |
+|---|---|
+| `ctrl+space` `d` | detaches, leaving the server running |
+| `ctrl+space` `,` | prompts to rename the current tab |
+| `ctrl+space` `&` | closes the current tab |
+| `ctrl+space` `s` | opens the workspace picker, not settings |
+| `ctrl+space` `shift+s` | opens settings |
+| `ctrl+space` `;` | jumps to the last pane |
+
+Also confirm the unchanged defaults still behave: `h/j/k/l` focus panes, `z` zooms, `x` closes a pane, `c` makes a tab, `n`/`p` cycle tabs, `1`-`9` switch tabs.
+
+- [ ] **Step 5: Verify the integrations end to end**
+
+```bash
+herdr integration status | grep -E '^(pi|claude):'
+```
+
+Expected: both report `current`.
+
+Then, in a herdr pane, run a short `claude` or `pi` prompt, switch to a different workspace, and confirm an OS notification fires when it finishes. This is the payoff of `ui.toast.delivery = "system"` — if nothing appears, check macOS notification permissions for the terminal app before suspecting the config.
+
+- [ ] **Step 6: Confirm nothing leaked into the repo**
+
+```bash
+cd ~/dotfiles && git status --porcelain && git ls-files herdr/
+```
+
+Expected: `git ls-files herdr/` lists exactly one path, `herdr/.config/herdr/config.toml`. No `.sock`, no `session.json`, no `.plugins.lock`, no logs. This is the check that proves the folding guard worked.
+
+- [ ] **Step 7: Update the spec Status line**
+
+In `docs/superpowers/specs/2026-09-09-herdr-tmux-bindings-design.md`, replace the Status line:
+
+```markdown
+**Status:** design approved; integrations already installed (see
+"Integrations"), config and repo wiring not yet written.
+```
+
+with a line recording the outcome — implemented date, whether the split orientation held or was swapped, and anything that did not work. Record what actually happened, including failures; the 2026-08-16 spec's Status section is the model.
+
+- [ ] **Step 8: Commit**
+
+```bash
+cd ~/dotfiles
+git add docs/superpowers/specs/2026-09-09-herdr-tmux-bindings-design.md herdr/
+git commit -m "Verify herdr bindings; record outcome in the spec"
+```
+
+---
+
+## Cleanup, once verified
+
+`~/.config/herdr/config.toml.pre-stow.bak` from Task 1 Step 3 holds only `onboarding = false`, which the new config preserves. Delete it after Task 4 passes. Leave it in place if anything in Task 4 is still unresolved.
+
+## Not in scope
+
+Removing or editing the tmux package; a `claude` or `pi` stow package; herdr's other 15 integrations; remote/SSH herdr; worktree workflows; custom themes; sounds; the lazygit popup binding.
