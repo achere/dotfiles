@@ -90,10 +90,11 @@ Changed, because herdr's default contradicts tmux:
 | `%` split side-by-side | `split_vertical = "prefix+v"` | `prefix+percent` |
 | `d` detach | `detach = "prefix+q"` | `prefix+d` |
 | `,` rename-window | `rename_tab = "prefix+shift+t"` | `prefix+comma` |
-| `&` kill-window | `close_tab = "prefix+shift+x"` | `prefix+ampersand` |
+| `&` kill-window, with confirmation | `close_tab = "prefix+shift+x"`, no confirmation | `close_tab = ""`; `prefix+ampersand` rebound to a confirming popup (see "Config file") |
 | `s` choose-session | `settings = "prefix+s"` | `workspace_picker = "prefix+s"`; `settings` moves to `prefix+shift+s` |
 | `;` last-pane | `last_pane` unset | `prefix+semicolon` |
 | `x` kill-pane, with confirmation | `close_pane = "prefix+x"`, no confirmation | `close_pane = ""`; `prefix+x` rebound to a confirming popup (see "Config file") |
+| `q` display-panes | `goto = "prefix+g"`, no equivalent binding | `goto` also bound at `prefix+q`, alongside the default `prefix+g` — see note below |
 
 herdr 0.9.0 has no equivalent of tmux's kill-pane confirmation as a config
 option: `confirm_close_pane`, `confirm_pane_close`, `pane_confirm_close` and
@@ -104,10 +105,26 @@ closing a pane unasked. The popup command bound above reconstructs the
 missing confirmation from outside herdr's config surface, since there is
 nothing to turn on inside it.
 
+herdr's `close_tab` has the identical gap: there is no tab-scoped confirm
+setting either, and `ui.confirm_close` still only guards workspace closure.
+The popup bound to `prefix+ampersand` reconstructs tmux's `&` prompt the
+same way the pane-close popup does, and additionally reports the tab's
+label and how many panes will close with it — more than tmux's own prompt
+shows.
+
+tmux's `prefix q` is display-panes: it numbers the panes and jumps to
+whichever one is pressed next. herdr has no per-pane numbering to match —
+it numbers *agents* in its sidebar, not panes — so there is no exact
+equivalent, only a nearest one: NAVIGATE mode, reached via `goto`, an
+overlay moved with `h/j/k/l` and the arrows, with `1`-`9` reserved for
+selection and `esc` to back out. Bound here as a second chord for `goto`,
+`prefix+q`; herdr's default `prefix+g` stays bound as well, so the action
+now answers to both.
+
 Deliberately left at herdr defaults — herdr-native actions with no tmux
 equivalent, so there is no muscle memory to honour: `prefix+b` sidebar,
-`prefix+g` goto, `prefix+r` resize mode, `prefix+e` scrollback into
-`$EDITOR`, `prefix+shift+g` new worktree, `prefix+o` notification jump,
+`prefix+r` resize mode, `prefix+e` scrollback into `$EDITOR`,
+`prefix+shift+g` new worktree, `prefix+o` notification jump,
 `prefix+shift+n` new workspace, `prefix+shift+r` reload config.
 
 ### Key-name syntax, verified empirically
@@ -184,7 +201,22 @@ split_vertical   = "prefix+percent"
 
 detach     = "prefix+d"          # tmux d; herdr's default prefix+q goes unbound
 rename_tab = "prefix+comma"      # tmux , rename-window
-close_tab  = "prefix+ampersand"  # tmux & kill-window
+
+# tmux's `&` (kill-window) prompts before closing; herdr's close_tab does
+# not, and ui.confirm_close only guards workspaces, not tabs - the same gap
+# close_pane has below, with no tab-scoped confirm setting to flip either.
+# Unbind here; prefix+ampersand is rebound to a confirming popup at the end
+# of this file, alongside the pane-close one it mirrors.
+close_tab  = ""
+
+# tmux `prefix q` is display-panes: numbers the panes, press one to jump.
+# herdr's nearest equivalent is NAVIGATE mode, reached via goto - an overlay
+# moved with h/j/k/l and the arrows, 1-9 reserved for selection, esc to back
+# out. Not an exact match: herdr numbers agents in its sidebar, not panes,
+# so this is the closest equivalent in access pattern rather than the same
+# thing. prefix+q was free because detach moved to prefix+d above; herdr's
+# default prefix+g stays bound too, so goto now answers to both.
+goto = "prefix+q"
 
 # tmux s is choose-session, and a workspace is herdr's nearest equivalent.
 # Settings moves aside to make room.
@@ -247,6 +279,24 @@ type = "popup"
 width = "50%"
 height = "20%"
 command = '''bash -c 'p=$(herdr api snapshot | jq -r .result.snapshot.focused_pane_id); c=$(herdr pane get "$p" | jq -r .result.pane.cwd); printf "Close pane %s (%s)? [y/N] " "$p" "$c"; read -n 1 -r a; echo; case "$a" in [yY]) herdr pane close "$p" ;; esac' '''
+
+# Reconstructs the confirmation tmux gives on `&` (kill-window), which
+# herdr's close_tab does not have - see close_tab above, and there is no
+# tab-scoped confirm setting to enable instead. Rebuilds it from outside the
+# config surface, the same way the pane-close popup above does. `herdr tab
+# close` takes an explicit tab id, so the script resolves the focused one
+# via `herdr api snapshot`'s focused_tab_id, then shows its label AND how
+# many panes go with it - more than tmux's own prompt tells you. Runs under
+# `bash`, not `sh`, for the same reason as the pane-close popup: `read -n 1`
+# takes a single keypress without waiting for Enter, and that flag is a
+# bashism. Only `y`/`Y` closes the tab; anything else, including a bare
+# Enter, declines.
+[[keys.command]]
+key = "prefix+ampersand"
+type = "popup"
+width = "50%"
+height = "20%"
+command = '''bash -c 't=$(herdr api snapshot | jq -r .result.snapshot.focused_tab_id); l=$(herdr tab get "$t" | jq -r .result.tab.label); n=$(herdr pane list | jq -r "[.result.panes[]|select(.tab_id==\"$t\")]|length"); printf "Close tab %s (%s panes)? [y/N] " "$l" "$n"; read -n 1 -r a; echo; case "$a" in [yY]) herdr tab close "$t" ;; esac' '''
 ```
 
 The `[ui]` block was added afterward, for a visible border between the

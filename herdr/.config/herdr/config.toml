@@ -31,7 +31,22 @@ split_vertical   = "prefix+percent"
 
 detach     = "prefix+d"          # tmux d; herdr's default prefix+q goes unbound
 rename_tab = "prefix+comma"      # tmux , rename-window
-close_tab  = "prefix+ampersand"  # tmux & kill-window
+
+# tmux's `&` (kill-window) prompts before closing; herdr's close_tab does
+# not, and ui.confirm_close only guards workspaces, not tabs - the same gap
+# close_pane has below, with no tab-scoped confirm setting to flip either.
+# Unbind here; prefix+ampersand is rebound to a confirming popup at the end
+# of this file, alongside the pane-close one it mirrors.
+close_tab  = ""
+
+# tmux `prefix q` is display-panes: numbers the panes, press one to jump.
+# herdr's nearest equivalent is NAVIGATE mode, reached via goto - an overlay
+# moved with h/j/k/l and the arrows, 1-9 reserved for selection, esc to back
+# out. Not an exact match: herdr numbers agents in its sidebar, not panes,
+# so this is the closest equivalent in access pattern rather than the same
+# thing. prefix+q was free because detach moved to prefix+d above; herdr's
+# default prefix+g stays bound too, so goto now answers to both.
+goto = "prefix+q"
 
 # tmux s is choose-session, and a workspace is herdr's nearest equivalent.
 # Settings moves aside to make room.
@@ -94,3 +109,21 @@ type = "popup"
 width = "50%"
 height = "20%"
 command = '''bash -c 'p=$(herdr api snapshot | jq -r .result.snapshot.focused_pane_id); c=$(herdr pane get "$p" | jq -r .result.pane.cwd); printf "Close pane %s (%s)? [y/N] " "$p" "$c"; read -n 1 -r a; echo; case "$a" in [yY]) herdr pane close "$p" ;; esac' '''
+
+# Reconstructs the confirmation tmux gives on `&` (kill-window), which
+# herdr's close_tab does not have - see close_tab above, and there is no
+# tab-scoped confirm setting to enable instead. Rebuilds it from outside the
+# config surface, the same way the pane-close popup above does. `herdr tab
+# close` takes an explicit tab id, so the script resolves the focused one
+# via `herdr api snapshot`'s focused_tab_id, then shows its label AND how
+# many panes go with it - more than tmux's own prompt tells you. Runs under
+# `bash`, not `sh`, for the same reason as the pane-close popup: `read -n 1`
+# takes a single keypress without waiting for Enter, and that flag is a
+# bashism. Only `y`/`Y` closes the tab; anything else, including a bare
+# Enter, declines.
+[[keys.command]]
+key = "prefix+ampersand"
+type = "popup"
+width = "50%"
+height = "20%"
+command = '''bash -c 't=$(herdr api snapshot | jq -r .result.snapshot.focused_tab_id); l=$(herdr tab get "$t" | jq -r .result.tab.label); n=$(herdr pane list | jq -r "[.result.panes[]|select(.tab_id==\"$t\")]|length"); printf "Close tab %s (%s panes)? [y/N] " "$l" "$n"; read -n 1 -r a; echo; case "$a" in [yY]) herdr tab close "$t" ;; esac' '''
