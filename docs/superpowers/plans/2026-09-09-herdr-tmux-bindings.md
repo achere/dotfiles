@@ -90,10 +90,33 @@ last_pane = "prefix+semicolon"   # tmux ; last-pane; unset in herdr by default
 # rejected as invalid keybindings - named spellings don't cover every key.
 copy_mode = "prefix+["
 
+# herdr 0.9.0 has no pane-close confirmation of its own - confirm_close_pane,
+# confirm_pane_close, pane_confirm_close and confirm_kill_pane all fail
+# `herdr config check` with "unknown config key", and ui.confirm_close (see
+# below) only guards workspaces, not panes. tmux's `prefix x` does prompt, so
+# this is a real gap against muscle memory, not a missing tmux mapping.
+# Unbind herdr's silent default and replace it with a popup that asks.
+close_pane = ""
+
 [ui.toast]
 # Ping the OS when a pi or claude pane finishes or needs input. Off by
 # default; this is what the agent integrations actually buy.
 delivery = "system"
+
+# Reconstructs the confirmation tmux gives on `prefix x` but herdr's own
+# close_pane does not. `herdr pane close` takes an explicit pane id rather
+# than acting on "the current pane", so the script asks the running server
+# for one via `herdr api snapshot`'s focused_pane_id. The prompt deliberately
+# echoes that id and its cwd: if the popup is ever slow to update focus and
+# this resolves to a pane other than the one the user meant to close, that
+# mismatch is visible in the prompt and declinable, instead of silently
+# closing the wrong pane.
+[[keys.command]]
+key = "prefix+x"
+type = "popup"
+width = "50%"
+height = "20%"
+command = '''sh -c 'p=$(herdr api snapshot | jq -r .result.snapshot.focused_pane_id); c=$(herdr pane get "$p" | jq -r .result.pane.cwd); printf "Close pane %s (%s)? [y/N] " "$p" "$c"; read a; case "$a" in [yY]*) herdr pane close "$p" ;; esac' '''
 ```
 
 - [ ] **Step 2: Prove the migration is needed (the failing check)**

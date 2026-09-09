@@ -4,9 +4,19 @@
 **Status:** config, Brewfile/bootstrap wiring and zsh completions are
 implemented and committed (see "Config file" and "Repo wiring"). Both agent
 integrations are installed; `herdr integration status` reports `pi: current`
-and `claude: current`. Not yet done: the interactive verification — confirming
-split orientation and exercising the remaining changed keybindings — has not
-been performed.
+and `claude: current`. A pane-close confirmation popup was added afterward
+(see "Config file") to close a gap found during use: herdr 0.9.0 has no
+config option for it at all, not just a default that needed changing.
+
+Interactive verification is partial. CONFIRMED by pressing keys:
+`prefix+percent` splits side by side, and `prefix+"` splits stacked — herdr's
+vertical/horizontal naming does invert tmux's `-v`/`-h` flag letters, as the
+"Config file" comment states. The original binding, `prefix+quote`, was
+WRONG: `quote` parses and `herdr config check` accepted it, but it actually
+matches the apostrophe key, not `"`. Root cause: `herdr config check`
+validates that a key name parses, not which physical key it matches — only
+pressing the binding proves that. NOT yet exercised: `d`, `,`, `&`, `s`,
+`shift+s`, `;`, `[` copy mode, and the new pane-close popup.
 
 ## Goal
 
@@ -76,13 +86,23 @@ Changed, because herdr's default contradicts tmux:
 | tmux | herdr default | set to |
 |---|---|---|
 | `C-Space` prefix | `ctrl+b` | `ctrl+space` |
-| `"` split stacked | `split_horizontal = "prefix+minus"` | `prefix+quote` |
+| `"` split stacked | `split_horizontal = "prefix+minus"` | `` prefix+" `` |
 | `%` split side-by-side | `split_vertical = "prefix+v"` | `prefix+percent` |
 | `d` detach | `detach = "prefix+q"` | `prefix+d` |
 | `,` rename-window | `rename_tab = "prefix+shift+t"` | `prefix+comma` |
 | `&` kill-window | `close_tab = "prefix+shift+x"` | `prefix+ampersand` |
 | `s` choose-session | `settings = "prefix+s"` | `workspace_picker = "prefix+s"`; `settings` moves to `prefix+shift+s` |
 | `;` last-pane | `last_pane` unset | `prefix+semicolon` |
+| `x` kill-pane, with confirmation | `close_pane = "prefix+x"`, no confirmation | `close_pane = ""`; `prefix+x` rebound to a confirming popup (see "Config file") |
+
+herdr 0.9.0 has no equivalent of tmux's kill-pane confirmation as a config
+option: `confirm_close_pane`, `confirm_pane_close`, `pane_confirm_close` and
+`confirm_kill_pane` were all probed and all fail `herdr config check` with
+`unknown config key`. `ui.confirm_close` does exist and defaults to `true`,
+but it guards workspace closure only — it does not stop `prefix x` from
+closing a pane unasked. The popup command bound above reconstructs the
+missing confirmation from outside herdr's config surface, since there is
+nothing to turn on inside it.
 
 Deliberately left at herdr defaults — herdr-native actions with no tmux
 equivalent, so there is no muscle memory to honour: `prefix+b` sidebar,
@@ -181,10 +201,33 @@ last_pane = "prefix+semicolon"   # tmux ; last-pane; unset in herdr by default
 # rejected as invalid keybindings - named spellings don't cover every key.
 copy_mode = "prefix+["
 
+# herdr 0.9.0 has no pane-close confirmation of its own - confirm_close_pane,
+# confirm_pane_close, pane_confirm_close and confirm_kill_pane all fail
+# `herdr config check` with "unknown config key", and ui.confirm_close (see
+# below) only guards workspaces, not panes. tmux's `prefix x` does prompt, so
+# this is a real gap against muscle memory, not a missing tmux mapping.
+# Unbind herdr's silent default and replace it with a popup that asks.
+close_pane = ""
+
 [ui.toast]
 # Ping the OS when a pi or claude pane finishes or needs input. Off by
 # default; this is what the agent integrations actually buy.
 delivery = "system"
+
+# Reconstructs the confirmation tmux gives on `prefix x` but herdr's own
+# close_pane does not. `herdr pane close` takes an explicit pane id rather
+# than acting on "the current pane", so the script asks the running server
+# for one via `herdr api snapshot`'s focused_pane_id. The prompt deliberately
+# echoes that id and its cwd: if the popup is ever slow to update focus and
+# this resolves to a pane other than the one the user meant to close, that
+# mismatch is visible in the prompt and declinable, instead of silently
+# closing the wrong pane.
+[[keys.command]]
+key = "prefix+x"
+type = "popup"
+width = "50%"
+height = "20%"
+command = '''sh -c 'p=$(herdr api snapshot | jq -r .result.snapshot.focused_pane_id); c=$(herdr pane get "$p" | jq -r .result.pane.cwd); printf "Close pane %s (%s)? [y/N] " "$p" "$c"; read a; case "$a" in [yY]*) herdr pane close "$p" ;; esac' '''
 ```
 
 ## Repo wiring
