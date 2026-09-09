@@ -34,6 +34,11 @@ settings         = "prefix+shift+s"
 
 last_pane = "prefix+semicolon"   # tmux ; last-pane; unset in herdr by default
 
+# tmux `prefix [` enters copy mode; herdr's copy mode has the same vi-style
+# motions built in. Easy to miss: this action is absent from herdr
+# --default-config output, which makes it look unsupported when it isn't.
+copy_mode = "prefix+["
+
 [ui.toast]
 # Ping the OS when a pi or claude pane finishes or needs input. Off by
 # default; this is what the agent integrations actually buy.
