@@ -262,6 +262,19 @@ pane_outer_borders = true
 # default; this is what the agent integrations actually buy.
 delivery = "system"
 
+[experimental]
+# herdr already restores workspaces, tabs, panes, layout, and cwd from
+# ~/.config/herdr/session.json across a server restart, and
+# session.resume_agents_on_restore (on by default) resumes pi/claude panes
+# into their native conversation sessions - none of that needs configuring
+# here. What it does not restore by default is each pane's screen history,
+# so a restored pane comes back blank even though the agent session behind
+# it is intact. pane_history closes that specific gap. It lives under
+# [experimental] because saved history costs disk, which is why herdr ships
+# it off - the rough equivalent of what tmux-resurrect does for the tmux
+# setup above, except herdr's covers agent conversations too.
+pane_history = true
+
 # Reconstructs the confirmation tmux gives on `prefix x` but herdr's own
 # close_pane does not. `herdr pane close` takes an explicit pane id rather
 # than acting on "the current pane", so the script asks the running server
@@ -304,6 +317,18 @@ sidebar and the pane area: herdr exposes no sidebar-border setting, so
 `pane_borders = "always"` plus `pane_outer_borders` is the mechanism —
 `"always"` frames a pane even when it isn't split, and the outer-border flag
 is what draws that frame's outside edge, the side facing the sidebar.
+
+Session restore across a server restart is native and needed no
+configuration beyond `[experimental] pane_history` (see "Config file"
+above) — workspaces, tabs, panes, layout, cwd and, via
+`session.resume_agents_on_restore`, the agent conversations themselves all
+come back on their own. A related option was considered and declined:
+herdr ships a launchd service, `sh.brew.herdr.plist`, with `RunAtLoad` and
+`KeepAlive`, which would start the server at login. Not enabled — it only
+matters for agents resuming before a terminal is opened, and a
+launchd-started server inherits launchd's environment rather than the
+user's shell, so panes could see a different `PATH`. Deliberately absent
+from the `Brewfile` for the same reason.
 
 ## Repo wiring
 

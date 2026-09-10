@@ -92,6 +92,19 @@ pane_outer_borders = true
 # default; this is what the agent integrations actually buy.
 delivery = "system"
 
+[experimental]
+# herdr already restores workspaces, tabs, panes, layout, and cwd from
+# ~/.config/herdr/session.json across a server restart, and
+# session.resume_agents_on_restore (on by default) resumes pi/claude panes
+# into their native conversation sessions - none of that needs configuring
+# here. What it does not restore by default is each pane's screen history,
+# so a restored pane comes back blank even though the agent session behind
+# it is intact. pane_history closes that specific gap. It lives under
+# [experimental] because saved history costs disk, which is why herdr ships
+# it off - the rough equivalent of what tmux-resurrect does for the tmux
+# setup above, except herdr's covers agent conversations too.
+pane_history = true
+
 # Reconstructs the confirmation tmux gives on `prefix x` but herdr's own
 # close_pane does not. `herdr pane close` takes an explicit pane id rather
 # than acting on "the current pane", so the script asks the running server
