@@ -19,16 +19,17 @@ advice has been reversed (see "Key-name syntax, verified empirically").
 
 CONFIRMED by the user pressing keys: `prefix+percent` splits side by side;
 `prefix+"` splits stacked; `prefix+[` enters copy mode; `prefix+comma`
-prompts to rename the tab; `prefix+s` opens the workspace picker;
-`prefix+shift+s` opens settings; the `prefix+x` pane-close popup, including
-its single-keypress y/n; the sidebar/pane border; `j`/`k` driving the
-NAVIGATE workspace list; and `prefix+alt+1..9` agent focus.
+prompts to rename the tab; `prefix+d` detaches; `prefix+semicolon` bounces
+back and forth between the last two focused panes; `prefix+s` opens the
+workspace picker; `prefix+shift+s` opens settings; the `prefix+x`
+pane-close popup, including its single-keypress y/n; the sidebar/pane
+border; `j`/`k` driving the NAVIGATE workspace list; and `prefix+alt+1..9`
+agent focus.
 
-Implemented but NOT individually exercised: `prefix+d` detach,
-`prefix+semicolon` last-pane, and the `prefix+ampersand` tab-close popup.
-The user reported "all good" over the group these were part of, so nothing
-appeared broken, but none of the three was pressed and confirmed on its
-own — that distinction matters more than the passing report.
+Implemented but NOT individually exercised: the `prefix+ampersand`
+tab-close popup. The user reported "all good" over the group it was part
+of, so nothing appeared broken, but it was not pressed and confirmed on
+its own — that distinction matters more than the passing report.
 
 Verified at the config level, without keypresses: both agent integrations
 report `current`; OS toasts fire via `ui.toast.delivery = "system"`;
@@ -121,6 +122,16 @@ Changed, because herdr's default contradicts tmux:
 | `;` last-pane | `last_pane` unset | `prefix+semicolon` |
 | `x` kill-pane, with confirmation | `close_pane = "prefix+x"`, no confirmation | `close_pane = ""`; `prefix+x` rebound to a confirming popup (see "Config file") |
 | `q` display-panes | `goto = "prefix+g"`, no equivalent binding | `goto` also bound at `prefix+q`, alongside the default `prefix+g` — see note below |
+
+`last_pane` turned out to have a broader scope than tmux's `prefix ;`. The
+user confirmed `prefix+semicolon` bounces between their two claude agent
+panes, and those panes live in *different workspaces* (`w3` and `w4`), not
+just different panes within one window. tmux's `prefix ;` is last-pane
+scoped to the current window; herdr's `last_pane` is global, crossing
+workspace boundaries the tmux binding was never able to. Worth stating
+plainly since the whole config is built on tmux parity: this is a point
+where herdr diverges from tmux and ends up strictly more capable, not a
+gap to patch over.
 
 herdr 0.9.0 has no equivalent of tmux's kill-pane confirmation as a config
 option: `confirm_close_pane`, `confirm_pane_close`, `pane_confirm_close` and
@@ -216,6 +227,17 @@ picks this back up should try `next_agent`/`previous_agent` first: as
 native actions rather than popups, they sidestep the popup focus problem
 entirely. For now, switching agents works by mouse — sidebar agent rows are
 clickable.
+
+Update: for the two-agent case specifically, `prefix+semicolon`
+(`last_pane`, see "Keybinding mapping") turns out to be the working
+keyboard answer this section was missing. The user confirmed it bounces
+between two claude agent panes living in different workspaces — one key,
+no picker, no fzf, and no index that shifts as workspaces come and go,
+which is exactly the numbering instability `focus_agent` documents above.
+This does not replace the picker or close this gap generally: it works
+here only because a toggle between exactly two things needs no list, and
+it says nothing about the three-or-more-agent case. `next_agent`/
+`previous_agent` remain untried for that case.
 
 ## Config file
 
