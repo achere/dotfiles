@@ -23,8 +23,14 @@ mkdir -p "$HOME/.config/tmux" "$HOME/.config/wezterm" "$HOME/.config/lazygit" \
 
 # 4. link the packages
 cd "$DOTFILES"
-stow -n -v tmux wezterm zsh lazygit starship herdr   # dry run first, always
-stow -v tmux wezterm zsh lazygit starship herdr
+#    -R (restow = unstow, then stow) rather than a plain stow, so this script
+#    doubles as the update path. Plain stow only ever adds links: a config file
+#    renamed or deleted in this repo since the last run leaves its old symlink
+#    behind in ~/.config, dangling and invisible. -R clears those orphans. On a
+#    machine that has never been stowed the unstow half is a no-op, so this is
+#    also correct on a fresh install.
+stow -n -R -v tmux wezterm zsh lazygit starship herdr   # dry run first, always
+stow -R -v tmux wezterm zsh lazygit starship herdr
 
 # 5. everything the configs depend on
 brew bundle install --file="$DOTFILES/Brewfile"
