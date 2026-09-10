@@ -179,6 +179,15 @@ through `fzf`, with the selection resolved back to a pane id and handed to
 above: reconstructing missing behaviour from outside the config surface
 because there is nothing to turn on inside it.
 
+A herdr popup is session-modal: on close, herdr restores focus to the pane
+the user came from, unconditionally. Calling `herdr agent focus` while the
+popup is still open therefore gets undone the instant it tears down - the
+selection reaches herdr, then focus snaps back. The fix, recorded in the
+"Config file" comment, is to detach the focus call with `nohup ... &` and
+delay it (`sleep 0.4`) so it lands after teardown instead of racing it.
+Worth remembering for any other popup that needs to leave a lasting effect
+on focus.
+
 ## Config file
 
 `herdr/.config/herdr/config.toml`:
@@ -365,13 +374,19 @@ command = '''bash -c 't=$(herdr api snapshot | jq -r .result.snapshot.focused_ta
 # load-bearing control flow, not a defensive guard: pressing esc in fzf
 # selects nothing, and without this check an empty "$p" would still be
 # handed to `herdr agent focus`, moving focus on a no-op selection instead
-# of leaving it untouched.
+# of leaving it untouched. This popup is session-modal, so herdr restores
+# focus to the pane the user came from the moment it closes - calling
+# `herdr agent focus` directly, while the popup is still up, gets undone by
+# that restore. `nohup bash -c 'sleep 0.4; herdr agent focus ...' &` detaches
+# the focus call so it lands after teardown instead of before it. The delay
+# is a race against the popup closing, not a fixed protocol - if selection
+# ever stops taking effect, raising it is the first thing to try.
 [[keys.command]]
 key = "prefix+a"
 type = "popup"
 width = "70%"
 height = "40%"
-command = '''bash -c 'sel=$(herdr agent list | jq -r ".result.agents[] | [.pane_id, .agent, (.terminal_title_stripped // \"-\"), .agent_status, .cwd] | @tsv" | fzf --with-nth=2.. --prompt="agent> "); p=$(printf "%s" "$sel" | cut -f1); [ -n "$p" ] && herdr agent focus "$p"' '''
+command = '''bash -c 'sel=$(herdr agent list | jq -r ".result.agents[] | [.pane_id, .agent, (.terminal_title_stripped // \"-\"), .agent_status, .cwd] | @tsv" | fzf --with-nth=2.. --prompt="agent> "); p=$(printf "%s" "$sel" | cut -f1); [ -n "$p" ] && nohup bash -c "sleep 0.4; herdr agent focus \"$p\"" >/dev/null 2>&1 &' '''
 ```
 
 The `[ui]` block was added afterward, for a visible border between the
