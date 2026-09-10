@@ -163,6 +163,22 @@ Selection is also mouse-driven, independently of copy mode: `mouse_capture`
 and `copy_on_select` are both on by default. `prefix+e`, which dumps the pane
 scrollback into `$EDITOR`, is a third, unrelated route to the same content.
 
+### No agent-picker action — built as a custom command instead
+
+herdr has a `workspace_picker` action but nothing equivalent for agents.
+`agent_picker`, `agents_picker`, `pick_agent` and `agent_list` were all
+probed as config keys and all fail `herdr config check` with `unknown config
+key`. The only agent-navigation actions that do exist are `focus_agent`
+(jump to agent N, bound above), `next_agent` and `previous_agent` (cycle);
+all three ship unbound by default, which is why nothing switched between
+agent panes before this change. Since there is no action to bind, the picker
+bound to `prefix+a` (see "Config file") is not a config-surface binding at
+all — it is a `[[keys.command]]` popup built from `herdr agent list` piped
+through `fzf`, with the selection resolved back to a pane id and handed to
+`herdr agent focus`. Same pattern as the pane-close and tab-close popups
+above: reconstructing missing behaviour from outside the config surface
+because there is nothing to turn on inside it.
+
 ## Config file
 
 `herdr/.config/herdr/config.toml`:
@@ -256,6 +272,14 @@ copy_mode = "prefix+["
 # Unbind herdr's silent default and replace it with a popup that asks.
 close_pane = ""
 
+# herdr's keybinds screen lists "focus agent 1-9" - this is that entry,
+# bound to alt+1 through alt+9 behind the prefix chord. Jumps straight to
+# agent N in the sidebar. Numbering follows sidebar order, which
+# ui.agent_panel_sort controls: default "spaces" groups agents by workspace,
+# "priority" instead orders by which agent wants attention - either way N
+# shifts as workspaces come and go, it isn't pinned to one agent.
+focus_agent = "prefix+alt+1..9"
+
 # herdr has no sidebar-specific border setting - the full [ui] key list has
 # nothing border-related besides these two, so this is the mechanism for a
 # dividing line against the workspace sidebar. The default pane_borders =
@@ -325,6 +349,29 @@ type = "popup"
 width = "50%"
 height = "20%"
 command = '''bash -c 't=$(herdr api snapshot | jq -r .result.snapshot.focused_tab_id); l=$(herdr tab get "$t" | jq -r .result.tab.label); n=$(herdr pane list | jq -r "[.result.panes[]|select(.tab_id==\"$t\")]|length"); printf "Close tab %s (%s panes)? [y/N] " "$l" "$n"; read -n 1 -r a; echo; case "$a" in [yY]) herdr tab close "$t" ;; esac' '''
+
+# herdr has no agent-picker action - agent_picker, agents_picker, pick_agent
+# and agent_list were all probed and all fail `herdr config check` with
+# "unknown config key". Only focus_agent (above), next_agent and
+# previous_agent exist, and all three ship unbound by default - nothing
+# switches between agent panes out of the box. This reconstructs the missing
+# picker from outside the config surface, the counterpart to
+# workspace_picker on prefix+s: `herdr agent list` feeds fzf, which shows
+# agent, terminal title, status and cwd; `--with-nth=2..` hides the pane id
+# column so it doesn't clutter the picker, and `cut -f1` recovers that id
+# from the selected line to hand to `herdr agent focus`. next_agent and
+# previous_agent (cycle forward/back) are real actions too, and are
+# deliberately left unbound in favour of this picker. `[ -n "$p" ]` is
+# load-bearing control flow, not a defensive guard: pressing esc in fzf
+# selects nothing, and without this check an empty "$p" would still be
+# handed to `herdr agent focus`, moving focus on a no-op selection instead
+# of leaving it untouched.
+[[keys.command]]
+key = "prefix+a"
+type = "popup"
+width = "70%"
+height = "40%"
+command = '''bash -c 'sel=$(herdr agent list | jq -r ".result.agents[] | [.pane_id, .agent, (.terminal_title_stripped // \"-\"), .agent_status, .cwd] | @tsv" | fzf --with-nth=2.. --prompt="agent> "); p=$(printf "%s" "$sel" | cut -f1); [ -n "$p" ] && herdr agent focus "$p"' '''
 ```
 
 The `[ui]` block was added afterward, for a visible border between the
