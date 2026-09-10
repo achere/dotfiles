@@ -218,6 +218,21 @@ close_tab  = ""
 # default prefix+g stays bound too, so goto now answers to both.
 goto = "prefix+q"
 
+# NAVIGATE mode splits movement into two separate bindings: these move
+# through the workspace/session list, while navigate_pane_left/down/up/right
+# (left at their defaults, h/j/k/l) move between panes. The list ones
+# default to the arrow keys, which is why j/k looked dead in NAVIGATE mode -
+# they were bound to pane movement the whole time, which does nothing while
+# focus is on the list. Putting the list on vim keys matches the vi-mode
+# used throughout this setup (.zshrc's `bindkey -v`, tmux.conf's
+# `mode-keys vi`). Left unrecorded on purpose: navigate_pane_down/up are
+# still j/k by default too, so the same two keys are now named by two
+# bindings, and which one wins in a given context has not been checked -
+# only that this parses and reloads. Re-check pane movement in NAVIGATE mode
+# if list navigation starts behaving oddly.
+navigate_workspace_up   = "k"
+navigate_workspace_down = "j"
+
 # tmux s is choose-session, and a workspace is herdr's nearest equivalent.
 # Settings moves aside to make room.
 workspace_picker = "prefix+s"    # herdr's default prefix+w goes unbound
