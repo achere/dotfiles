@@ -163,30 +163,33 @@ Selection is also mouse-driven, independently of copy mode: `mouse_capture`
 and `copy_on_select` are both on by default. `prefix+e`, which dumps the pane
 scrollback into `$EDITOR`, is a third, unrelated route to the same content.
 
-### No agent-picker action — built as a custom command instead
+### No agent-picker action — attempted as a custom command, removed
 
 herdr has a `workspace_picker` action but nothing equivalent for agents.
 `agent_picker`, `agents_picker`, `pick_agent` and `agent_list` were all
 probed as config keys and all fail `herdr config check` with `unknown config
 key`. The only agent-navigation actions that do exist are `focus_agent`
-(jump to agent N, bound above), `next_agent` and `previous_agent` (cycle);
-all three ship unbound by default, which is why nothing switched between
-agent panes before this change. Since there is no action to bind, the picker
-bound to `prefix+a` (see "Config file") is not a config-surface binding at
-all — it is a `[[keys.command]]` popup built from `herdr agent list` piped
-through `fzf`, with the selection resolved back to a pane id and handed to
-`herdr agent focus`. Same pattern as the pane-close and tab-close popups
-above: reconstructing missing behaviour from outside the config surface
-because there is nothing to turn on inside it.
+(jump to agent N, bound here to `prefix+alt+1..9` and confirmed working),
+`next_agent` and `previous_agent` (cycle forward/back), and both of the
+latter two remain unbound.
 
-A herdr popup is session-modal: on close, herdr restores focus to the pane
-the user came from, unconditionally. Calling `herdr agent focus` while the
-popup is still open therefore gets undone the instant it tears down - the
-selection reaches herdr, then focus snaps back. The fix, recorded in the
-"Config file" comment, is to detach the focus call with `nohup ... &` and
-delay it (`sleep 0.4`) so it lands after teardown instead of racing it.
-Worth remembering for any other popup that needs to leave a lasting effect
-on focus.
+A `prefix+a` popup was built to fill the gap: a `[[keys.command]]` running
+`herdr agent list` piped through `fzf`, resolving the selection to a pane
+id and handing it to `herdr agent focus`. It was removed — the chosen agent
+never received focus, in two tries. The first called `herdr agent focus`
+directly inside the popup. The second detached it with
+`nohup bash -c 'sleep 0.4; herdr agent focus ...' &`, on the theory that the
+call needed to land after the popup tore down; that failed too. The actual
+cause is not established: the suspicion is that popups are session-modal
+and herdr restores focus to the originating pane on close, but the detached
+variant should have outrun that restore and didn't, so the suspicion is
+unconfirmed. The one solid data point is that `herdr agent focus <pane_id>`
+works correctly when run from an ordinary shell, so the CLI itself is not
+at fault — only something about the popup context defeats it. Whoever
+picks this back up should try `next_agent`/`previous_agent` first: as
+native actions rather than popups, they sidestep the popup focus problem
+entirely. For now, switching agents works by mouse — sidebar agent rows are
+clickable.
 
 ## Config file
 
@@ -358,35 +361,6 @@ type = "popup"
 width = "50%"
 height = "20%"
 command = '''bash -c 't=$(herdr api snapshot | jq -r .result.snapshot.focused_tab_id); l=$(herdr tab get "$t" | jq -r .result.tab.label); n=$(herdr pane list | jq -r "[.result.panes[]|select(.tab_id==\"$t\")]|length"); printf "Close tab %s (%s panes)? [y/N] " "$l" "$n"; read -n 1 -r a; echo; case "$a" in [yY]) herdr tab close "$t" ;; esac' '''
-
-# herdr has no agent-picker action - agent_picker, agents_picker, pick_agent
-# and agent_list were all probed and all fail `herdr config check` with
-# "unknown config key". Only focus_agent (above), next_agent and
-# previous_agent exist, and all three ship unbound by default - nothing
-# switches between agent panes out of the box. This reconstructs the missing
-# picker from outside the config surface, the counterpart to
-# workspace_picker on prefix+s: `herdr agent list` feeds fzf, which shows
-# agent, terminal title, status and cwd; `--with-nth=2..` hides the pane id
-# column so it doesn't clutter the picker, and `cut -f1` recovers that id
-# from the selected line to hand to `herdr agent focus`. next_agent and
-# previous_agent (cycle forward/back) are real actions too, and are
-# deliberately left unbound in favour of this picker. `[ -n "$p" ]` is
-# load-bearing control flow, not a defensive guard: pressing esc in fzf
-# selects nothing, and without this check an empty "$p" would still be
-# handed to `herdr agent focus`, moving focus on a no-op selection instead
-# of leaving it untouched. This popup is session-modal, so herdr restores
-# focus to the pane the user came from the moment it closes - calling
-# `herdr agent focus` directly, while the popup is still up, gets undone by
-# that restore. `nohup bash -c 'sleep 0.4; herdr agent focus ...' &` detaches
-# the focus call so it lands after teardown instead of before it. The delay
-# is a race against the popup closing, not a fixed protocol - if selection
-# ever stops taking effect, raising it is the first thing to try.
-[[keys.command]]
-key = "prefix+a"
-type = "popup"
-width = "70%"
-height = "40%"
-command = '''bash -c 'sel=$(herdr agent list | jq -r ".result.agents[] | [.pane_id, .agent, (.terminal_title_stripped // \"-\"), .agent_status, .cwd] | @tsv" | fzf --with-nth=2.. --prompt="agent> "); p=$(printf "%s" "$sel" | cut -f1); [ -n "$p" ] && nohup bash -c "sleep 0.4; herdr agent focus \"$p\"" >/dev/null 2>&1 &' '''
 ```
 
 The `[ui]` block was added afterward, for a visible border between the

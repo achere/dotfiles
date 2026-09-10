@@ -205,35 +205,6 @@ type = "popup"
 width = "50%"
 height = "20%"
 command = '''bash -c 't=$(herdr api snapshot | jq -r .result.snapshot.focused_tab_id); l=$(herdr tab get "$t" | jq -r .result.tab.label); n=$(herdr pane list | jq -r "[.result.panes[]|select(.tab_id==\"$t\")]|length"); printf "Close tab %s (%s panes)? [y/N] " "$l" "$n"; read -n 1 -r a; echo; case "$a" in [yY]) herdr tab close "$t" ;; esac' '''
-
-# herdr has no agent-picker action - agent_picker, agents_picker, pick_agent
-# and agent_list were all probed and all fail `herdr config check` with
-# "unknown config key". Only focus_agent (above), next_agent and
-# previous_agent exist, and all three ship unbound by default - nothing
-# switches between agent panes out of the box. This reconstructs the missing
-# picker from outside the config surface, the counterpart to
-# workspace_picker on prefix+s: `herdr agent list` feeds fzf, which shows
-# agent, terminal title, status and cwd; `--with-nth=2..` hides the pane id
-# column so it doesn't clutter the picker, and `cut -f1` recovers that id
-# from the selected line to hand to `herdr agent focus`. next_agent and
-# previous_agent (cycle forward/back) are real actions too, and are
-# deliberately left unbound in favour of this picker. `[ -n "$p" ]` is
-# load-bearing control flow, not a defensive guard: pressing esc in fzf
-# selects nothing, and without this check an empty "$p" would still be
-# handed to `herdr agent focus`, moving focus on a no-op selection instead
-# of leaving it untouched. This popup is session-modal, so herdr restores
-# focus to the pane the user came from the moment it closes - calling
-# `herdr agent focus` directly, while the popup is still up, gets undone by
-# that restore. `nohup bash -c 'sleep 0.4; herdr agent focus ...' &` detaches
-# the focus call so it lands after teardown instead of before it. The delay
-# is a race against the popup closing, not a fixed protocol - if selection
-# ever stops taking effect, raising it is the first thing to try.
-[[keys.command]]
-key = "prefix+a"
-type = "popup"
-width = "70%"
-height = "40%"
-command = '''bash -c 'sel=$(herdr agent list | jq -r ".result.agents[] | [.pane_id, .agent, (.terminal_title_stripped // \"-\"), .agent_status, .cwd] | @tsv" | fzf --with-nth=2.. --prompt="agent> "); p=$(printf "%s" "$sel" | cut -f1); [ -n "$p" ] && nohup bash -c "sleep 0.4; herdr agent focus \"$p\"" >/dev/null 2>&1 &' '''
 ```
 
 - [ ] **Step 2: Prove the migration is needed (the failing check)**
