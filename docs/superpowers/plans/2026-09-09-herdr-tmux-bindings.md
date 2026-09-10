@@ -31,7 +31,7 @@
 - Consumes: nothing.
 - Produces: `~/.config/herdr/config.toml` as a symlink into the repo. Task 2 adds the bootstrap lines that reproduce this on a new machine.
 
-- [ ] **Step 1: Create the package file**
+- [x] **Step 1: Create the package file**
 
 ```bash
 mkdir -p ~/dotfiles/herdr/.config/herdr
@@ -207,7 +207,7 @@ height = "20%"
 command = '''bash -c 't=$(herdr api snapshot | jq -r .result.snapshot.focused_tab_id); l=$(herdr tab get "$t" | jq -r .result.tab.label); n=$(herdr pane list | jq -r "[.result.panes[]|select(.tab_id==\"$t\")]|length"); printf "Close tab %s (%s panes)? [y/N] " "$l" "$n"; read -n 1 -r a; echo; case "$a" in [yY]) herdr tab close "$t" ;; esac' '''
 ```
 
-- [ ] **Step 2: Prove the migration is needed (the failing check)**
+- [x] **Step 2: Prove the migration is needed (the failing check)**
 
 Run: `cd ~/dotfiles && stow -n -v herdr`
 
@@ -216,7 +216,7 @@ Expected: FAILURE — stow reports an existing target, e.g.
 
 This confirms the live file must be moved before linking. If stow instead reports success, the live file is already gone — skip to Step 4.
 
-- [ ] **Step 3: Move the live config aside**
+- [x] **Step 3: Move the live config aside**
 
 ```bash
 mv ~/.config/herdr/config.toml ~/.config/herdr/config.toml.pre-stow.bak
@@ -224,7 +224,7 @@ mv ~/.config/herdr/config.toml ~/.config/herdr/config.toml.pre-stow.bak
 
 Do **not** remove `~/.config/herdr` itself. Removing the directory would make stow fold it, which is the failure this plan exists to prevent.
 
-- [ ] **Step 4: Re-run the dry run and read it carefully**
+- [x] **Step 4: Re-run the dry run and read it carefully**
 
 Run: `cd ~/dotfiles && stow -n -v herdr`
 
@@ -233,13 +233,13 @@ Expected: PASS, and the output must show a link being made for the **file**, not
 
 If the output instead says `LINK: .config/herdr => ...`, stop — the directory is being folded. Recreate `~/.config/herdr` and retry.
 
-- [ ] **Step 5: Link it**
+- [x] **Step 5: Link it**
 
 ```bash
 cd ~/dotfiles && stow -v herdr
 ```
 
-- [ ] **Step 6: Verify the link and validate the config**
+- [x] **Step 6: Verify the link and validate the config**
 
 ```bash
 ls -l ~/.config/herdr/config.toml
@@ -250,7 +250,7 @@ Expected: `config.toml` is a symlink into `~/dotfiles/herdr/`, and `herdr config
 
 `herdr config check` validates both action names and key names, so any typo in the TOML above surfaces here rather than silently disabling a binding.
 
-- [ ] **Step 7: Apply to the running server**
+- [x] **Step 7: Apply to the running server**
 
 ```bash
 herdr server reload-config
@@ -258,7 +258,7 @@ herdr server reload-config
 
 A herdr server is already running; without this the new bindings only take effect on the next server start.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 cd ~/dotfiles
@@ -280,7 +280,7 @@ git commit -m "Add herdr stow package with tmux-mapped keybindings"
 - Consumes: the `herdr` package directory created in Task 1.
 - Produces: a `bootstrap.sh` that reproduces Task 1's result plus both agent integrations on a fresh machine.
 
-- [ ] **Step 1: Add herdr to the Brewfile**
+- [x] **Step 1: Add herdr to the Brewfile**
 
 In `Brewfile`, under `# --- referenced by the other configs ---`, add after the `brew "go"` line:
 
@@ -290,7 +290,7 @@ brew "herdr"                        # herdr/.config/herdr/config.toml
 
 Do **not** add `pi-coding-agent` or `claude-code`. They are the agents herdr manages, not dependencies of these configs, and the Brewfile is curated as one line per thing these dotfiles actually need.
 
-- [ ] **Step 2: Add ~/.config/herdr to the pre-stow mkdir**
+- [x] **Step 2: Add ~/.config/herdr to the pre-stow mkdir**
 
 In `bootstrap.sh`, extend the step 3 comment block (currently lines 14-18) and its `mkdir -p` (line 19). Replace:
 
@@ -309,7 +309,7 @@ mkdir -p "$HOME/.config/tmux" "$HOME/.config/wezterm" "$HOME/.config/lazygit" \
          "$HOME/.config/herdr"
 ```
 
-- [ ] **Step 3: Add herdr to both stow lines**
+- [x] **Step 3: Add herdr to both stow lines**
 
 In `bootstrap.sh`, replace lines 23-24:
 
@@ -327,7 +327,7 @@ stow -v tmux wezterm zsh lazygit starship herdr
 
 Note the ordering constraint this creates: stow must run before herdr is first launched on a new machine, because herdr writes its own `config.toml` on first run and stow refuses to link over a real file. bootstrap already satisfies this — step 4 stows, and nothing launches herdr.
 
-- [ ] **Step 4: Add the integrations step**
+- [x] **Step 4: Add the integrations step**
 
 Append to the end of `bootstrap.sh`, after the existing step 8 comment:
 
@@ -346,13 +346,13 @@ herdr integration install pi
 herdr integration install claude
 ```
 
-- [ ] **Step 5: Syntax-check the script**
+- [x] **Step 5: Syntax-check the script**
 
 Run: `bash -n ~/dotfiles/bootstrap.sh`
 
 Expected: PASS, no output. This catches the line-continuation backslash in Step 2 being malformed.
 
-- [ ] **Step 6: Verify the Brewfile resolves**
+- [x] **Step 6: Verify the Brewfile resolves**
 
 Run: `cd ~/dotfiles && brew bundle check --file=Brewfile --verbose`
 
@@ -360,13 +360,13 @@ Expected: either `The Brewfile's dependencies are satisfied.` or a list naming o
 
 Per the 2026-08-16 spec, this check goes red on its own as formulae drift a patch behind, so a failure naming only other packages is not a regression from this task.
 
-- [ ] **Step 7: Verify the stow line is idempotent**
+- [x] **Step 7: Verify the stow line is idempotent**
 
 Run: `cd ~/dotfiles && stow -n -v tmux wezterm zsh lazygit starship herdr`
 
 Expected: PASS with no conflicts. Task 1 already linked `herdr`, so re-stowing must be a no-op rather than an error.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 cd ~/dotfiles
@@ -385,7 +385,7 @@ git commit -m "Bootstrap herdr: brew formula, pre-stow mkdir, agent integrations
 - Consumes: `brew "herdr"` from Task 2, which puts `herdr` on `PATH`.
 - Produces: `herdr <TAB>` subcommand completion in new shells.
 
-- [ ] **Step 1: Add the completion line**
+- [x] **Step 1: Add the completion line**
 
 In `zsh/.zshrc`, replace line 29:
 
@@ -402,19 +402,19 @@ source <(herdr completion zsh)
 
 Unguarded, matching the kubectl line directly above it and the repo's rejection of defensive guards. It must stay below `compinit` (line 20) — the same constraint the nvm block documents.
 
-- [ ] **Step 2: Verify the completion script is valid zsh**
+- [x] **Step 2: Verify the completion script is valid zsh**
 
 Run: `herdr completion zsh | zsh -n`
 
 Expected: PASS, no output. This checks the generated script parses before it is sourced into every future shell — a broken one would print errors on every shell start.
 
-- [ ] **Step 3: Verify it loads in a real shell**
+- [x] **Step 3: Verify it loads in a real shell**
 
 Run: `zsh -i -c 'echo ok' 2>&1 | tail -5`
 
 Expected: `ok`, with no errors mentioning `herdr` or `compdef`.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 cd ~/dotfiles
@@ -436,13 +436,13 @@ git commit -m "Load herdr zsh completions"
 
 This task is mostly interactive — it requires a human at a terminal pressing keys. Do not mark steps complete without actually running herdr.
 
-- [ ] **Step 1: Try to resolve split orientation without guessing**
+- [x] **Step 1: Try to resolve split orientation without guessing**
 
 Run: `herdr api --help` and look for a keymap or action-metadata subcommand that reports what `split_horizontal` does.
 
 If one exists, use it. If not, fall through to Step 2. This step exists because the orientation is the one claim in the spec that was inferred from herdr's naming and its `pane split --direction right|down` CLI rather than read from documentation.
 
-- [ ] **Step 2: Confirm orientation by pressing the keys**
+- [x] **Step 2: Confirm orientation by pressing the keys**
 
 Launch `herdr`, then press `ctrl+space` followed by `"`.
 
@@ -452,7 +452,7 @@ Then press `ctrl+space` followed by `%`.
 
 Expected: the pane splits **side by side** (new pane to the right), matching tmux's `%`.
 
-- [ ] **Step 3: Swap the values only if Step 2 was inverted**
+- [ ] **Step 3: Swap the values only if Step 2 was inverted** (not performed as written — the split orientation itself was correct; the actual bug was `quote` naming the apostrophe instead of `"`, fixed by rebinding `split_horizontal` to the literal `prefix+"` in commit `6f321ef`)
 
 If `"` split side by side and `%` split stacked, swap the two values in `herdr/.config/herdr/config.toml`:
 
@@ -465,7 +465,7 @@ Then update the comment directly above them, which currently claims herdr's nami
 
 If Step 2 passed, skip this step and change nothing.
 
-- [ ] **Step 4: Exercise the remaining changed bindings**
+- [x] **Step 4: Exercise the remaining changed bindings**
 
 With herdr running, confirm each of these does what tmux does:
 
@@ -480,7 +480,7 @@ With herdr running, confirm each of these does what tmux does:
 
 Also confirm the unchanged defaults still behave: `h/j/k/l` focus panes, `z` zooms, `x` closes a pane, `c` makes a tab, `n`/`p` cycle tabs, `1`-`9` switch tabs.
 
-- [ ] **Step 5: Verify the integrations end to end**
+- [x] **Step 5: Verify the integrations end to end**
 
 ```bash
 herdr integration status | grep -E '^(pi|claude):'
@@ -490,7 +490,7 @@ Expected: both report `current`.
 
 Then, in a herdr pane, run a short `claude` or `pi` prompt, switch to a different workspace, and confirm an OS notification fires when it finishes. This is the payoff of `ui.toast.delivery = "system"` — if nothing appears, check macOS notification permissions for the terminal app before suspecting the config.
 
-- [ ] **Step 6: Confirm nothing leaked into the repo**
+- [x] **Step 6: Confirm nothing leaked into the repo**
 
 ```bash
 cd ~/dotfiles && git status --porcelain && git ls-files herdr/
@@ -498,7 +498,7 @@ cd ~/dotfiles && git status --porcelain && git ls-files herdr/
 
 Expected: `git ls-files herdr/` lists exactly one path, `herdr/.config/herdr/config.toml`. No `.sock`, no `session.json`, no `.plugins.lock`, no logs. This is the check that proves the folding guard worked.
 
-- [ ] **Step 7: Update the spec Status line**
+- [x] **Step 7: Update the spec Status line**
 
 In `docs/superpowers/specs/2026-09-09-herdr-tmux-bindings-design.md`, replace the Status line:
 
@@ -509,7 +509,7 @@ In `docs/superpowers/specs/2026-09-09-herdr-tmux-bindings-design.md`, replace th
 
 with a line recording the outcome — implemented date, whether the split orientation held or was swapped, and anything that did not work. Record what actually happened, including failures; the 2026-08-16 spec's Status section is the model.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 cd ~/dotfiles

@@ -1,22 +1,48 @@
 # herdr with tmux keybindings + pi/claude integrations — design
 
 **Date:** 2026-09-09
-**Status:** config, Brewfile/bootstrap wiring and zsh completions are
-implemented and committed (see "Config file" and "Repo wiring"). Both agent
-integrations are installed; `herdr integration status` reports `pi: current`
-and `claude: current`. A pane-close confirmation popup was added afterward
-(see "Config file") to close a gap found during use: herdr 0.9.0 has no
-config option for it at all, not just a default that needed changing.
+**Status:** implemented 2026-09-10 — config, Brewfile/bootstrap wiring, zsh
+completions, and both agent integrations (`pi: current`, `claude: current`)
+are committed (see "Config file", "Repo wiring", "Integrations").
 
-Interactive verification is partial. CONFIRMED by pressing keys:
-`prefix+percent` splits side by side, and `prefix+"` splits stacked — herdr's
-vertical/horizontal naming does invert tmux's `-v`/`-h` flag letters, as the
-"Config file" comment states. The original binding, `prefix+quote`, was
-WRONG: `quote` parses and `herdr config check` accepted it, but it actually
-matches the apostrophe key, not `"`. Root cause: `herdr config check`
-validates that a key name parses, not which physical key it matches — only
-pressing the binding proves that. NOT yet exercised: `d`, `,`, `&`, `s`,
-`shift+s`, `;`, `[` copy mode, and the new pane-close popup.
+The bug that mattered: the original `split_horizontal = "prefix+quote"` was
+wrong. `quote` parses, and `herdr config check` accepted it, but it names
+the apostrophe key, not `"`. Fixed in `6f321ef` by rebinding to the literal
+`prefix+"`, which the user then confirmed splits the pane stacked;
+`prefix+percent` was separately confirmed splitting side by side, so
+herdr's vertical/horizontal naming does invert tmux's `-v`/`-h` flag
+letters, as originally suspected. This is the branch's main lesson:
+`herdr config check` only validates that a key name *parses*, not which
+physical key it matches — and this spec's original advice to prefer named
+spellings over literal punctuation is exactly what produced the bug. That
+advice has been reversed (see "Key-name syntax, verified empirically").
+
+CONFIRMED by the user pressing keys: `prefix+percent` splits side by side;
+`prefix+"` splits stacked; `prefix+[` enters copy mode; `prefix+comma`
+prompts to rename the tab; `prefix+s` opens the workspace picker;
+`prefix+shift+s` opens settings; the `prefix+x` pane-close popup, including
+its single-keypress y/n; the sidebar/pane border; `j`/`k` driving the
+NAVIGATE workspace list; and `prefix+alt+1..9` agent focus.
+
+Implemented but NOT individually exercised: `prefix+d` detach,
+`prefix+semicolon` last-pane, and the `prefix+ampersand` tab-close popup.
+The user reported "all good" over the group these were part of, so nothing
+appeared broken, but none of the three was pressed and confirmed on its
+own — that distinction matters more than the passing report.
+
+Verified at the config level, without keypresses: both agent integrations
+report `current`; OS toasts fire via `ui.toast.delivery = "system"`;
+`experimental.pane_history = true`; zsh completions load; `herdr config
+check` is clean; bootstrap's new integration step was verified end-to-end
+in a scratch `HOME`.
+
+Deferred, not done: the fzf agent-picker popup (see "No agent-picker
+action — attempted as a custom command, removed") was built and then
+removed — the selected agent never received focus, across two variants,
+and the cause is not established. `next_agent`/`previous_agent` are
+untried as an alternative. Mouse selection works in the meantime. Also
+deliberately not done: the launchd service for pre-login session restore,
+rejected over its environment/`PATH` caveat (see "Config file").
 
 ## Goal
 
