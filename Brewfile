@@ -23,4 +23,5 @@ brew "ripgrep"
 brew "tree-sitter-cli"
 
 cask "wezterm"                      # wezterm.lua
-cask "font-fira-code-nerd-font"     # wezterm.lua font
+cask "ghostty"                      # ghostty config
+cask "font-fira-code-nerd-font"     # wezterm.lua / ghostty config font

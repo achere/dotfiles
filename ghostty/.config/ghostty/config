@@ -1,0 +1,27 @@
+# Mirrors wezterm/.config/wezterm/wezterm.lua — keep the two in sync.
+
+# color_scheme = "Dracula"
+theme = Dracula
+
+# font = wezterm.font("FiraCode Nerd Font Mono"); font_size = 15.0
+font-family = FiraCode Nerd Font Mono
+font-size = 15
+
+# config.colors.cursor_bg / cursor_fg
+cursor-color = #D173E2
+cursor-text = #000000
+cursor-style = block
+cursor-style-blink = false
+
+# Shell integration's vi-mode cursor handling overrides cursor-style/-blink
+# above (bar cursor in insert mode, forced blink) regardless of what they're
+# set to. Keep shell integration's other features (title, path, etc.), just
+# drop the cursor one.
+shell-integration-features = no-cursor
+
+# window_decorations = "RESIZE": no titlebar, window stays resizable.
+macos-titlebar-style = hidden
+
+# Without this, Option is consumed as a dead-key/compose input instead of
+# acting as Alt, so alt+backspace (delete word) and similar keybinds don't fire.
+macos-option-as-alt = true
