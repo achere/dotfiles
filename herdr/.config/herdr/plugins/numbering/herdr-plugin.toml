@@ -1,0 +1,62 @@
+# herdr numbering plugin. Every hook runs the same script, because a run is a
+# full reconciliation rather than a reaction to a payload - so no hook needs
+# to know which event woke it, and a missed event self-heals on the next one.
+#
+# Commands are argv arrays run without a shell, and their working directory is
+# this plugin directory, so "renumber.sh" resolves without a path.
+id = "dotfiles.numbering"
+name = "Numbering"
+version = "0.1.0"
+min_herdr_version = "0.9.1"
+description = "Keep tab numbers in tab names and space numbers in the sidebar"
+platforms = ["macos"]
+
+# Metadata tokens are runtime-only - WorkspaceSnapshot has no tokens field -
+# so without this the sidebar numbers come back blank after a server restart.
+# Tab names persist on their own, being custom names.
+[[startup]]
+command = ["bash", "renumber.sh"]
+
+# Tabs: the four events that change a tab's position or name.
+[[events]]
+on = "tab.created"
+command = ["bash", "renumber.sh"]
+
+[[events]]
+on = "tab.closed"
+command = ["bash", "renumber.sh"]
+
+[[events]]
+on = "tab.moved"
+command = ["bash", "renumber.sh"]
+
+# Fires even when a rename changed nothing (src/app/api/tabs.rs:158-168), so
+# this hook re-triggers itself unless the script skips correct labels. It does.
+[[events]]
+on = "tab.renamed"
+command = ["bash", "renumber.sh"]
+
+# Spaces: the events that change workspace order.
+[[events]]
+on = "workspace.created"
+command = ["bash", "renumber.sh"]
+
+[[events]]
+on = "workspace.closed"
+command = ["bash", "renumber.sh"]
+
+[[events]]
+on = "workspace.moved"
+command = ["bash", "renumber.sh"]
+
+[[events]]
+on = "workspace.reordered"
+command = ["bash", "renumber.sh"]
+
+[[events]]
+on = "worktree.opened"
+command = ["bash", "renumber.sh"]
+
+[[events]]
+on = "worktree.removed"
+command = ["bash", "renumber.sh"]
