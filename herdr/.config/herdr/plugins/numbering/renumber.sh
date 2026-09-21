@@ -75,6 +75,7 @@ SOURCE_ID="numbering"
 # `herdr tab list` returns tabs in position order - both list paths walk
 # ws.tabs by index and neither sorts (src/app/api/tabs.rs:23-29, 290-300).
 plan_tab_renames() {
+  local tabs_json=$1
   local workspace tab_id label prev_workspace="" position=0 desired
   while IFS=$'\t' read -r workspace tab_id label; do
     if [[ $workspace != "$prev_workspace" ]]; then
@@ -85,7 +86,7 @@ plan_tab_renames() {
     desired=$(desired_label "$position" "$label")
     [[ $desired == "$label" ]] && continue
     printf 'rename\t%s\t%s\n' "$tab_id" "$desired"
-  done < <("$HERDR" tab list | jq -r '.result.tabs[] | [.workspace_id, .tab_id, .label] | @tsv')
+  done < <(jq -r '.result.tabs[] | [.workspace_id, .tab_id, .label] | @tsv' <<<"$tabs_json")
 }
 
 # Space numbers. The array index is the server's workspace order, which is what
@@ -95,13 +96,24 @@ plan_tab_renames() {
 # workspace.metadata_updated is excluded from hook events
 # (src/api/schema/events.rs:351-357).
 plan_space_tokens() {
-  "$HERDR" workspace list |
-    jq -r '.result.workspaces | to_entries[] | ["token", .value.workspace_id, (.key + 1)] | @tsv'
+  local workspaces_json=$1
+  jq -r '.result.workspaces | to_entries[] | ["token", .value.workspace_id, (.key + 1)] | @tsv' <<<"$workspaces_json"
 }
 
+# Fetches both payloads up front and validates each before any position is
+# counted. `set -e` does not propagate out of a process substitution feeding
+# a while loop, so a truncated-but-valid list would otherwise go unnoticed
+# and positions would be computed from a partial tab set - not an empty plan
+# (safe), but a WRONG one written to the user's real tabs. Fail closed:
+# return 1 rather than plan from an incomplete or malformed payload.
 plan_actions() {
-  plan_tab_renames
-  plan_space_tokens
+  local tabs_json workspaces_json
+  tabs_json=$("$HERDR" tab list) || return 1
+  jq -e '.result.tabs | type == "array"' <<<"$tabs_json" >/dev/null || return 1
+  workspaces_json=$("$HERDR" workspace list) || return 1
+  jq -e '.result.workspaces | type == "array"' <<<"$workspaces_json" >/dev/null || return 1
+  plan_tab_renames "$tabs_json"
+  plan_space_tokens "$workspaces_json"
 }
 
 # The undo. Restores any name this plugin did not already corrupt: a name that
@@ -141,7 +153,10 @@ apply_actions() {
 }
 
 reconcile() {
-  apply_actions "$(plan_actions)"
+  local actions
+  # A failed plan is not a reason to apply a partial one - do nothing instead.
+  actions=$(plan_actions) || return 0
+  apply_actions "$actions"
 }
 
 # --- serialising runs -----------------------------------------------------
@@ -155,16 +170,36 @@ MAX_PASSES=5
 # mkdir, not flock: macOS ships no flock binary. `stat -f %m` is BSD stat.
 take_lock() {
   mkdir -p "$STATE_DIR"
-  mkdir "$LOCK_DIR" 2>/dev/null && return 0
+  if mkdir "$LOCK_DIR" 2>/dev/null; then
+    printf '%s' "$$" >"$LOCK_DIR/pid"
+    return 0
+  fi
   local now mtime
   now=$(date +%s)
   mtime=$(stat -f %m "$LOCK_DIR" 2>/dev/null || printf '%s' "$now")
   if ((now - mtime > LOCK_STALE_SECONDS)); then
     # A run was killed mid-flight. Do not let it wedge the plugin forever.
+    # Breaks regardless of whose pid is inside - staleness alone is the test.
+    rm -f "$LOCK_DIR/pid"
     rmdir "$LOCK_DIR" 2>/dev/null || true
-    mkdir "$LOCK_DIR" 2>/dev/null && return 0
+    if mkdir "$LOCK_DIR" 2>/dev/null; then
+      printf '%s' "$$" >"$LOCK_DIR/pid"
+      return 0
+    fi
   fi
   return 1
+}
+
+# After a stale break, two runs can believe they hold the lock. Release only
+# the lock this run actually owns, or the first to finish would rmdir the
+# other's lock out from under it.
+release_lock() {
+  local owner_pid
+  owner_pid=$(cat "$LOCK_DIR/pid" 2>/dev/null || true)
+  if [[ $owner_pid == "$$" ]]; then
+    rm -f "$LOCK_DIR/pid"
+    rmdir "$LOCK_DIR" 2>/dev/null || true
+  fi
 }
 
 main() {
@@ -174,7 +209,9 @@ main() {
     return 0
   fi
   if [[ ${DRY_RUN:-0} == 1 ]]; then
-    actions=$(plan_actions)
+    # A failed fetch prints nothing and exits 0, same as a real empty plan -
+    # never a partial plan.
+    actions=$(plan_actions) || return 0
     [[ -n $actions ]] && printf '%s\n' "$actions"
     return 0
   fi
@@ -186,7 +223,7 @@ main() {
     : >"$DIRTY_FILE"
     return 0
   fi
-  trap 'rmdir "$LOCK_DIR" 2>/dev/null || true' EXIT
+  trap release_lock EXIT
 
   # Cleared before reconciling, so an event arriving mid-pass sets it again.
   rm -f "$DIRTY_FILE"
