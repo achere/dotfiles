@@ -44,6 +44,19 @@ desired_label() {
   printf '%s:%s' "$position" "$(strip_number_prefix "$label")"
 }
 
+# What --strip should rename a tab to. Returns the label unchanged when
+# stripping would leave nothing: herdr has no objection to an empty tab name,
+# and an unnamed tab is worse than a stamped one.
+safe_stripped_label() {
+  local label=$1 stripped
+  stripped=$(strip_number_prefix "$label")
+  if [[ -z $stripped ]]; then
+    printf '%s' "$label"
+  else
+    printf '%s' "$stripped"
+  fi
+}
+
 # Sourced by renumber_test.sh, which wants the functions and nothing else.
 if [[ ${RENUMBER_LIB_ONLY:-0} == 1 ]]; then
   return 0
@@ -91,8 +104,30 @@ plan_actions() {
   plan_space_tokens
 }
 
+# The undo. Restores any name this plugin did not already corrupt: a name that
+# was eaten on the way in (12:30 standup -> 1:30 standup) strips to
+# "30 standup" and is unrecoverable, and a tab renamed once is custom-named
+# for good - there is no API to un-name one.
+strip_all() {
+  local tab_id label stripped workspace_id
+  while IFS=$'\t' read -r tab_id label; do
+    stripped=$(safe_stripped_label "$label")
+    [[ $stripped == "$label" ]] && continue
+    "$HERDR" tab rename "$tab_id" "$stripped" >/dev/null
+  done < <("$HERDR" tab list | jq -r '.result.tabs[] | [.tab_id, .label] | @tsv')
+
+  while read -r workspace_id; do
+    "$HERDR" workspace report-metadata "$workspace_id" \
+      --source "$SOURCE_ID" --clear-token n >/dev/null
+  done < <("$HERDR" workspace list | jq -r '.result.workspaces[].workspace_id')
+}
+
 main() {
   local actions
+  if [[ ${1:-} == "--strip" ]]; then
+    strip_all
+    return 0
+  fi
   if [[ ${DRY_RUN:-0} == 1 ]]; then
     actions=$(plan_actions)
     [[ -n $actions ]] && printf '%s\n' "$actions"

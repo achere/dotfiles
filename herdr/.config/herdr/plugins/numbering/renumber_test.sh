@@ -29,6 +29,11 @@ check "strip removes a prefix"           "nvim"            "$(strip_number_prefi
 check "strip leaves a bare name"         "nvim"            "$(strip_number_prefix 'nvim')"
 check "strip is not greedy"              "2:nvim"          "$(strip_number_prefix '3:2:nvim')"
 
+# A tab labelled exactly "3:" would strip to nothing. herdr accepts an empty
+# name, and a nameless tab is worse than a stamped one, so it is left alone.
+check "strip refuses to empty a label"   "3:"              "$(safe_stripped_label '3:')"
+check "strip returns the stripped name"  "nvim"            "$(safe_stripped_label '2:nvim')"
+
 if ((failures > 0)); then
   printf '\n%d check(s) failed\n' "$failures"
   exit 1
