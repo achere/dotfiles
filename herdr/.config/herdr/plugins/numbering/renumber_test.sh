@@ -33,6 +33,15 @@ check "strip is not greedy"              "2:nvim"          "$(strip_number_prefi
 # name, and a nameless tab is worse than a stamped one, so it is left alone.
 check "strip refuses to empty a label"   "3:"              "$(safe_stripped_label '3:')"
 check "strip returns the stripped name"  "nvim"            "$(safe_stripped_label '2:nvim')"
+# A second empty-refusal case, distinct label shape from the one above -
+# pins that the refusal is general, not a fluke of "3:" specifically.
+check "strip refuses to empty a label 2" "10:"             "$(safe_stripped_label '10:')"
+# A label that strips to something starting with "-". `herdr tab rename`
+# was suspected of parsing this as a flag; verified against a live isolated
+# herdr 0.9.1 server that it does not (see the comment above plan_strip in
+# renumber.sh). Pinned here so a dash-leading result is a supported,
+# intentional outcome, not a surprise the next time this is touched.
+check "strip result may start with -"    "-foo"            "$(safe_stripped_label '1:-foo')"
 
 if ((failures > 0)); then
   printf '\n%d check(s) failed\n' "$failures"

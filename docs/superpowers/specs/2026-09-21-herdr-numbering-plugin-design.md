@@ -169,9 +169,10 @@ update. The holder read its snapshot before the newer event happened, so
 dropping the newer run leaves stale numbers on screen until some unrelated
 event happens to fire. Instead a contending run touches a `dirty` marker
 beside the lock and exits; the holder checks for `dirty` before releasing,
-and if it is set, clears it and reconciles once more. That is the payoff for
-reconciling instead of reacting to payloads: a burst of events collapses into
-at most one extra pass, and nothing is dropped.
+and if it is set, clears it and reconciles once more, up to `MAX_PASSES`
+times. That is the payoff for reconciling instead of reacting to payloads: a
+burst of events collapses into at most five extra passes, and nothing is
+dropped.
 
 The spaces half needs no guard at all — `workspace.metadata_updated` is
 deliberately excluded from hook-eligible events
@@ -184,7 +185,7 @@ plugin that reported it.
 |---|---|
 | `renumber.sh` | Reconcile. What the hooks call. |
 | `DRY_RUN=1 renumber.sh` | Print the renames and token reports it would issue; write nothing. |
-| `renumber.sh --strip` | Remove every `^[0-9]+:` prefix and clear the `n` tokens. The undo. |
+| `herdr plugin unlink dotfiles.numbering` then `renumber.sh --strip` | Remove every `^[0-9]+:` prefix and clear the `n` tokens. The undo — but only in that order; see below. |
 | `renumber_test.sh` | Table-driven check of the pure label transform. No server. |
 
 `--strip` restores any name the plugin did not already corrupt. Two things it
@@ -193,6 +194,21 @@ un-name one), which is the second reason auto-named tabs are left untouched;
 and a name that was eaten on the way in stays eaten — `12:30 standup` stamps
 to `1:30 standup` and strips to `30 standup`. Stripping is what destroys it,
 and it is unrecoverable.
+
+**`--strip` does not work while the plugin is armed — unlink first.**
+`strip_all` takes no lock and checks no registry state before renaming; each
+rename it issues is an ordinary `herdr tab rename`, and `handle_tab_rename`
+emits `tab.renamed` unconditionally regardless of who called it
+(`src/app/api/tabs.rs:158-168`). If `dotfiles.numbering` is still linked and
+enabled, that event wakes the hook, which reconciles and re-stamps the
+number right back on — within milliseconds, before a human watching the tab
+bar can register the strip happened. The token-clear half doesn't wake
+anything directly (`workspace.metadata_updated` is excluded from hook
+events), but it gets undone too: the re-stamp renames trigger a reconcile,
+and `plan_space_tokens` reports the `n` tokens unconditionally on every
+reconcile, with no diff against what is already there. So the correct
+sequence is `herdr plugin unlink dotfiles.numbering` **first**, to stop the
+hook from firing, and only then `renumber.sh --strip`.
 
 ## Config changes
 
@@ -259,10 +275,18 @@ Four layers, cheapest first. The first two carry no risk to the live session.
    `[[startup]]` hook, and read `$n` in the sidebar. `herdr plugin log list`
    shows each hook run with exit code and stderr when nothing appears to
    happen.
-4. **`--strip`** — run it and confirm the tab bar returns to plain names.
+4. **`--strip`** — `herdr plugin unlink dotfiles.numbering` first, then run it
+   and confirm the tab bar returns to plain names. Running `--strip` while
+   still linked is not a valid check: the hook re-stamps every tab within
+   milliseconds, so the tab bar would appear unchanged for the wrong reason.
 
 ## Known limits
 
+- **`--strip` only undoes anything while the plugin is unlinked.** With
+  `dotfiles.numbering` still armed, every rename `strip_all` issues fires
+  `tab.renamed`, which wakes the hook and re-stamps the number right back on
+  before it can be observed removed. `herdr plugin unlink dotfiles.numbering`
+  first, `renumber.sh --strip` second.
 - **Space numbers can disagree with `prefix+shift+N`.** The plugin numbers by
   the server's workspace order; the keybinding resolves against the client's
   *visible* list (`navigation_workspace_entries`,

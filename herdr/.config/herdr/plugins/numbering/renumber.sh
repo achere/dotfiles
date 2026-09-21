@@ -112,26 +112,47 @@ plan_actions() {
   jq -e '.result.tabs | type == "array"' <<<"$tabs_json" >/dev/null || return 1
   workspaces_json=$("$HERDR" workspace list) || return 1
   jq -e '.result.workspaces | type == "array"' <<<"$workspaces_json" >/dev/null || return 1
-  plan_tab_renames "$tabs_json"
+  # Tokens first, renames second: a failing `herdr tab rename` trips `set -e`
+  # partway through apply_actions. Metadata tokens are runtime-only and
+  # restored only by the startup hook, so a rename failure during a startup
+  # reconcile would otherwise leave the sidebar numbers blank until some
+  # unrelated event fired - emitting the tokens first means they are already
+  # applied by the time a rename can abort the run.
   plan_space_tokens "$workspaces_json"
+  plan_tab_renames "$tabs_json"
 }
 
 # The undo. Restores any name this plugin did not already corrupt: a name that
 # was eaten on the way in (12:30 standup -> 1:30 standup) strips to
 # "30 standup" and is unrecoverable, and a tab renamed once is custom-named
 # for good - there is no API to un-name one.
-strip_all() {
+#
+# A label whose stripped form starts with "-" (a tab named "1:-foo") was
+# suspected of tripping `herdr tab rename`'s flag parsing and aborting this
+# loop mid-list under `set -e`. Verified against a live herdr 0.9.1 server
+# (isolated, not the user's): `herdr tab rename <id> -foo` renames cleanly,
+# exit 0 - LABEL... is a variadic positional and the CLI accepts a leading
+# "-" in it. No guard is needed, and none is applied: prepending `--` was
+# tried too and is actively wrong here, since this LABEL arg treats `--` as
+# a literal token rather than an end-of-flags marker ("1:-foo" would strip to
+# "-- -foo", not "-foo"). If a future herdr version tightens this parsing,
+# `renumber_test.sh`'s dash-leading case plus this comment are the trail back
+# to why.
+plan_strip() {
   local tab_id label stripped workspace_id
   while IFS=$'\t' read -r tab_id label; do
     stripped=$(safe_stripped_label "$label")
     [[ $stripped == "$label" ]] && continue
-    "$HERDR" tab rename "$tab_id" "$stripped" >/dev/null
+    printf 'rename\t%s\t%s\n' "$tab_id" "$stripped"
   done < <("$HERDR" tab list | jq -r '.result.tabs[] | [.tab_id, .label] | @tsv')
 
   while read -r workspace_id; do
-    "$HERDR" workspace report-metadata "$workspace_id" \
-      --source "$SOURCE_ID" --clear-token n >/dev/null
+    printf 'clear\t%s\n' "$workspace_id"
   done < <("$HERDR" workspace list | jq -r '.result.workspaces[].workspace_id')
+}
+
+strip_all() {
+  apply_actions "$(plan_strip)"
 }
 
 # --- applying -------------------------------------------------------------
@@ -147,6 +168,10 @@ apply_actions() {
       token)
         "$HERDR" workspace report-metadata "$target" \
           --source "$SOURCE_ID" --token "n=$value" >/dev/null
+        ;;
+      clear)
+        "$HERDR" workspace report-metadata "$target" \
+          --source "$SOURCE_ID" --clear-token n >/dev/null
         ;;
     esac
   done <<<"$actions"
@@ -204,15 +229,22 @@ release_lock() {
 
 main() {
   local actions pass=0
-  if [[ ${1:-} == "--strip" ]]; then
-    strip_all
-    return 0
-  fi
+  # DRY_RUN must win over every other switch, --strip included: it is the
+  # no-write promise, and a mode check that runs after it (as --strip used
+  # to) makes `DRY_RUN=1 renumber.sh --strip` write for real.
   if [[ ${DRY_RUN:-0} == 1 ]]; then
     # A failed fetch prints nothing and exits 0, same as a real empty plan -
     # never a partial plan.
-    actions=$(plan_actions) || return 0
+    if [[ ${1:-} == "--strip" ]]; then
+      actions=$(plan_strip) || return 0
+    else
+      actions=$(plan_actions) || return 0
+    fi
     [[ -n $actions ]] && printf '%s\n' "$actions"
+    return 0
+  fi
+  if [[ ${1:-} == "--strip" ]]; then
+    strip_all
     return 0
   fi
 
