@@ -122,8 +122,53 @@ strip_all() {
   done < <("$HERDR" workspace list | jq -r '.result.workspaces[].workspace_id')
 }
 
+# --- applying -------------------------------------------------------------
+
+apply_actions() {
+  local actions=$1 kind target value
+  [[ -z $actions ]] && return 0
+  while IFS=$'\t' read -r kind target value; do
+    case $kind in
+      rename)
+        "$HERDR" tab rename "$target" "$value" >/dev/null
+        ;;
+      token)
+        "$HERDR" workspace report-metadata "$target" \
+          --source "$SOURCE_ID" --token "n=$value" >/dev/null
+        ;;
+    esac
+  done <<<"$actions"
+}
+
+reconcile() {
+  apply_actions "$(plan_actions)"
+}
+
+# --- serialising runs -----------------------------------------------------
+
+STATE_DIR="${HERDR_PLUGIN_STATE_DIR:-${TMPDIR:-/tmp}/herdr-numbering}"
+LOCK_DIR="$STATE_DIR/lock"
+DIRTY_FILE="$STATE_DIR/dirty"
+LOCK_STALE_SECONDS=60
+MAX_PASSES=5
+
+# mkdir, not flock: macOS ships no flock binary. `stat -f %m` is BSD stat.
+take_lock() {
+  mkdir -p "$STATE_DIR"
+  mkdir "$LOCK_DIR" 2>/dev/null && return 0
+  local now mtime
+  now=$(date +%s)
+  mtime=$(stat -f %m "$LOCK_DIR" 2>/dev/null || printf '%s' "$now")
+  if ((now - mtime > LOCK_STALE_SECONDS)); then
+    # A run was killed mid-flight. Do not let it wedge the plugin forever.
+    rmdir "$LOCK_DIR" 2>/dev/null || true
+    mkdir "$LOCK_DIR" 2>/dev/null && return 0
+  fi
+  return 1
+}
+
 main() {
-  local actions
+  local actions pass=0
   if [[ ${1:-} == "--strip" ]]; then
     strip_all
     return 0
@@ -133,6 +178,24 @@ main() {
     [[ -n $actions ]] && printf '%s\n' "$actions"
     return 0
   fi
+
+  if ! take_lock; then
+    # Losing the race must not drop this run's work: the holder read its
+    # snapshot before whatever just happened. Leave a marker it will see.
+    mkdir -p "$STATE_DIR"
+    : >"$DIRTY_FILE"
+    return 0
+  fi
+  trap 'rmdir "$LOCK_DIR" 2>/dev/null || true' EXIT
+
+  # Cleared before reconciling, so an event arriving mid-pass sets it again.
+  rm -f "$DIRTY_FILE"
+  reconcile
+  while [[ -f $DIRTY_FILE ]] && ((pass < MAX_PASSES)); do
+    rm -f "$DIRTY_FILE"
+    reconcile
+    pass=$((pass + 1))
+  done
 }
 
 main "$@"
