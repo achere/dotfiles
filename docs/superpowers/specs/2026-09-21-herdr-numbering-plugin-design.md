@@ -13,13 +13,23 @@ Verified at the CLI level, without keypresses: `renumber_test.sh`'s label
 transform table; `DRY_RUN=1 renumber.sh` against the real session; the plugin
 linked live via `herdr plugin link` and listed as `dotfiles.numbering`,
 enabled, with zero manifest warnings; a tab created via `herdr tab create`
-came back numbered (`3:task7-test`) alongside the user's untouched tabs;
-renaming that tab via `herdr tab rename` returned `3:renamed-test`; closing
-it via `herdr tab close` closed the numbering gap with no tabs left behind;
-`herdr api snapshot` shows `n` tokens (`"1"`, `"2"`, `"3"`) on all three live
-workspaces; `herdr plugin log list` shows exactly 12 hook runs from this
-session, all `exit_code: 0` with empty stderr, returned as a bounded list,
-not a stream.
+came back numbered (`3:task7-test`) alongside the user's untouched tabs,
+including the pre-existing auto-named tab `2`, which the plugin correctly
+left unprefixed; renaming that tab via `herdr tab rename` returned
+`3:renamed-test`; a second pair of tabs (`t7a`, `t7b`) was created to
+specifically exercise the middle-close case — closing the tab at position 3
+(`t7a`) shifted the tab after it (`t7b`) from `4:t7b` to `3:t7b`, closing the
+gap, not merely leaving a tidy list; `herdr api snapshot` shows `n` tokens
+(`"1"`, `"2"`, `"3"`) on all three live workspaces; `herdr plugin log list`
+shows every hook run bounded as a plain list (not a stream), all
+`exit_code: 0` with empty stderr — one `tab.created` event cascades into a
+`tab.renamed` run per tab needing relabeling (a fresh session's first create
+touched 8 of the user's tabs, skipping the auto-named `2`), a `tab.renamed`
+event that changes nothing beyond the target produces 1-2 further runs
+before the loop guard settles, and a `tab.closed` run only cascades into a
+further `tab.renamed` when a gap actually needs closing (observed directly:
+the `t7a` close produced exactly one `tab.closed` run plus one `tab.renamed`
+run relabeling `t7b`).
 
 Implemented but NOT individually exercised: the `worktree.opened` /
 `worktree.removed` / `workspace.moved` / `workspace.reordered` hooks — no
