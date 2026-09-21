@@ -75,3 +75,13 @@ mkdir -p "$HOME/.nvm"
 mkdir -p "$HOME/.claude" "$HOME/.pi/agent/extensions"
 herdr integration install pi
 herdr integration install claude
+
+# 10. the numbering plugin keeps each tab's number in its name and reports
+#     each space's number to the sidebar. Like the integrations above, stow
+#     alone does not arm it: herdr's plugin registry lives at
+#     ~/.config/herdr/plugins.json, which is machine-local and gitignored
+#     alongside the sockets and session.json, so a fresh machine has to be
+#     told about the plugin explicitly. The plugin's files themselves DO
+#     arrive by stow, under herdr/.config/herdr/plugins/numbering. Linking is
+#     idempotent, so this doubles as the update path, like the restow above.
+herdr plugin link "$HOME/.config/herdr/plugins/numbering"

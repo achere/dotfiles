@@ -727,24 +727,39 @@ on = "worktree.removed"
 command = ["bash", "renumber.sh"]
 ```
 
-- [ ] **Step 2: Link it into a scratch config dir**
+- [ ] **Step 2: Link it into a scratch config dir AND a scratch socket**
 
 Linking into the normal config dir would arm the running server immediately,
 because the plugin registry lives in the config dir
 (`src/persist/plugin_registry.rs:11`) and is shared across sessions. So use a
-scratch one:
+scratch one.
+
+CORRECTION (recorded during Task 7, proven during Task 5's execution):
+`XDG_CONFIG_HOME` alone does NOT isolate a second server. It was assumed this
+env var would scope the CLI's server discovery the same way it scopes config
+files; in practice, with a server already running, herdr CLI calls route to
+the *live* server's socket regardless of `XDG_CONFIG_HOME`, and a `herdr
+plugin link` meant for the scratch dir landed in the real registry instead.
+Config-path env vars do not scope server discovery — only the socket
+location does, via `HERDR_SOCKET_PATH`. Use both, on every command,
+including the server invocation itself:
 
 ```bash
 export SCRATCH=$(mktemp -d)
 mkdir -p "$SCRATCH/herdr"
 cp herdr/.config/herdr/config.toml "$SCRATCH/herdr/config.toml"
-XDG_CONFIG_HOME="$SCRATCH" herdr plugin link "$PWD/herdr/.config/herdr/plugins/numbering"
-XDG_CONFIG_HOME="$SCRATCH" herdr plugin list
+export HERDR_SOCKET=/tmp/hnum.sock   # short path: stays under the ~104-byte Unix socket path limit
+env XDG_CONFIG_HOME="$SCRATCH" HERDR_SOCKET_PATH="$HERDR_SOCKET" herdr server > "$SCRATCH/server.log" 2>&1 &
+sleep 2
+env XDG_CONFIG_HOME="$SCRATCH" HERDR_SOCKET_PATH="$HERDR_SOCKET" herdr plugin link "$PWD/herdr/.config/herdr/plugins/numbering"
+env XDG_CONFIG_HOME="$SCRATCH" HERDR_SOCKET_PATH="$HERDR_SOCKET" herdr plugin list
 ```
 
 Expected: the plugin lists as `dotfiles.numbering`, enabled, with no warning
 about unknown event names. An `unknown event` warning means a hook name is
-wrong — fix it before continuing.
+wrong — fix it before continuing. Confirm isolation held by re-checking
+`herdr plugin list` with no env vars set — it must still show only what was
+in the live registry before this step, not `dotfiles.numbering`.
 
 - [ ] **Step 3: Hand to the user — exercise the hooks in the scratch server**
 
@@ -752,7 +767,7 @@ This needs a human at an interactive TUI. Ask the user to run, in a terminal
 that is not inside the live herdr session:
 
 ```bash
-XDG_CONFIG_HOME="$SCRATCH" herdr
+env XDG_CONFIG_HOME="$SCRATCH" HERDR_SOCKET_PATH="$HERDR_SOCKET" herdr
 ```
 
 That starts a second herdr server with its own session state and its own
@@ -767,7 +782,7 @@ plugin registry; the live session is untouched. In it, ask them to confirm:
 If nothing happens, the diagnosis is here:
 
 ```bash
-XDG_CONFIG_HOME="$SCRATCH" herdr plugin log list | tail -20
+env XDG_CONFIG_HOME="$SCRATCH" HERDR_SOCKET_PATH="$HERDR_SOCKET" herdr plugin log list | tail -20
 ```
 
 which shows each hook run with its exit code and stderr.
@@ -775,7 +790,7 @@ which shows each hook run with its exit code and stderr.
 - [ ] **Step 4: Tear down the scratch server and commit**
 
 ```bash
-XDG_CONFIG_HOME="$SCRATCH" herdr server stop || true
+env XDG_CONFIG_HOME="$SCRATCH" HERDR_SOCKET_PATH="$HERDR_SOCKET" herdr server stop || true
 rm -rf "$SCRATCH"
 git add herdr/.config/herdr/plugins/numbering/herdr-plugin.toml
 git commit -m "$(cat <<'MSG'

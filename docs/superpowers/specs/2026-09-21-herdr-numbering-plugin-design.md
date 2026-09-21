@@ -1,9 +1,32 @@
 # herdr tab and space numbering plugin — design
 
 **Date:** 2026-09-21
-**Status:** designed, not implemented. The spaces mechanism was verified live
-against herdr 0.9.1 before writing (see "Verified before designing");
-everything else is read from the v0.9.1 source and marked as such.
+**Status:** implemented 2026-09-21 — plugin, config, and bootstrap wiring are
+committed.
+
+CONFIRMED by the user pressing keys: nothing yet — all verification below was
+done at the CLI, by an agent, not by the user at the keyboard. The sidebar
+rendering `● 1 · dotfiles` and the `prefix+shift+1..9` keypress have NOT been
+confirmed by anyone.
+
+Verified at the CLI level, without keypresses: `renumber_test.sh`'s label
+transform table; `DRY_RUN=1 renumber.sh` against the real session; the plugin
+linked live via `herdr plugin link` and listed as `dotfiles.numbering`,
+enabled, with zero manifest warnings; a tab created via `herdr tab create`
+came back numbered (`3:task7-test`) alongside the user's untouched tabs;
+renaming that tab via `herdr tab rename` returned `3:renamed-test`; closing
+it via `herdr tab close` closed the numbering gap with no tabs left behind;
+`herdr api snapshot` shows `n` tokens (`"1"`, `"2"`, `"3"`) on all three live
+workspaces; `herdr plugin log list` shows exactly 12 hook runs from this
+session, all `exit_code: 0` with empty stderr, returned as a bounded list,
+not a stream.
+
+Implemented but NOT individually exercised: the `worktree.opened` /
+`worktree.removed` / `workspace.moved` / `workspace.reordered` hooks — no
+worktree or workspace reorder occurred during this verification pass, so
+those wire up to the same `renumber.sh` but were not individually fired; the
+`[[startup]]` hook (would require restarting the live server, out of scope
+for arming); and `--strip`.
 
 ## Goal
 
@@ -207,11 +230,21 @@ Four layers, cheapest first. The first two carry no risk to the live session.
    known-eaten case so the limitation is pinned, not discovered.
 2. **`DRY_RUN=1 renumber.sh`** against the real session — prints what it would
    do to the seven real tabs, writes nothing.
-3. **An isolated live server.** `XDG_CONFIG_HOME=$(mktemp -d)`, copy
-   `config.toml` in, link the plugin there, run `herdr`. Real hooks, real tab
-   bar, live session untouched — necessary because the plugin registry lives in
-   the config dir and is shared across named sessions, so linking into the
-   normal config dir arms the running server immediately. Exercise: create a
+3. **An isolated live server.** Assumed during planning that
+   `XDG_CONFIG_HOME=$(mktemp -d)` alone would scope a second `herdr` instance
+   away from the live one. Observed during Task 5's execution that it does
+   not: with a server already running, herdr CLI calls route to the *live*
+   server's socket regardless of `XDG_CONFIG_HOME` — a `herdr plugin link`
+   meant for the scratch dir landed in the real registry instead (see
+   `task-5-report.md`). Config-path env vars (`XDG_CONFIG_HOME`,
+   `HERDR_CONFIG_PATH`) do not scope server discovery; only the socket
+   location does, via `HERDR_SOCKET_PATH`. True isolation requires **both**:
+   `XDG_CONFIG_HOME=$(mktemp -d)` for config/registry state *and*
+   `HERDR_SOCKET_PATH` pointed at a scratch socket (a short path, e.g.
+   `/tmp/hnum.sock`, to stay under the ~104-byte Unix socket path limit), set
+   on every command including the `herdr server` invocation itself. Copy
+   `config.toml` in, link the plugin there, run `herdr server` with both vars
+   set. Real hooks, real tab bar, live session untouched. Exercise: create a
    tab, close a middle tab, move one, rename one, restart the server for the
    `[[startup]]` hook, and read `$n` in the sidebar. `herdr plugin log list`
    shows each hook run with exit code and stderr when nothing appears to
