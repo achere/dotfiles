@@ -89,8 +89,8 @@ close_pane = ""
 # herdr's keybinds screen lists "focus agent 1-9" - this is that entry,
 # bound to alt+1 through alt+9 behind the prefix chord. Jumps straight to
 # agent N in the sidebar. Numbering follows sidebar order, which
-# ui.agent_panel_sort controls: default "spaces" groups agents by workspace,
-# "priority" instead orders by which agent wants attention - either way N
+# ui.agent_panel_sort controls - set to "priority" below, so N follows the
+# attention queue rather than workspace grouping - either way N
 # shifts as workspaces come and go, it isn't pinned to one agent.
 focus_agent = "prefix+alt+1..9"
 
@@ -109,6 +109,17 @@ focus_agent = "prefix+alt+1..9"
 [ui]
 pane_borders = "always"
 pane_outer_borders = true
+
+# Agent panel ordering: "spaces" groups agents by workspace, "priority" orders
+# them by which one wants attention. Chosen in herdr's own Settings screen -
+# but that screen does NOT write here. It writes
+# ~/.local/state/herdr/client-shell/local-<hash>.json, machine-local client
+# state keyed by a hash of the socket path, so the choice was invisible to this
+# repo until it was set here. Precedence runs the other way, though: once that
+# state file exists it overrides this key on that machine, so editing this line
+# alone will not move a client that has already been toggled - delete the
+# state file to hand control back to this config.
+agent_panel_sort = "priority"
 
 [ui.toast]
 # Ping the OS when a pi or claude pane finishes or needs input. Off by
