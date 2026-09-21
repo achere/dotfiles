@@ -68,6 +68,12 @@ navigate_workspace_down = "j"
 workspace_picker = "prefix+s"    # herdr's default prefix+w goes unbound
 settings         = "prefix+shift+s"
 
+# Jump to space 1-9, matching the numbers the numbering plugin puts in the
+# sidebar. Unset in herdr by default, and a deliberate deviation from tmux,
+# which has no jump-to-session-by-number binding - without it the space
+# numbers would be decoration nothing acts on.
+switch_workspace = "prefix+shift+1..9"
+
 last_pane = "prefix+semicolon"   # tmux ; last-pane; unset in herdr by default
 
 # tmux `prefix [` enters copy mode; herdr's copy mode has the same vi-style
@@ -120,6 +126,18 @@ pane_outer_borders = true
 # alone will not move a client that has already been toggled - delete the
 # state file to hand control back to this config.
 agent_panel_sort = "priority"
+
+# Space numbers in the expanded sidebar. herdr draws no number there - the
+# collapsed rail does (src/client/shell/sidebar.rs:62-77), while the expanded
+# rows take only state_icon, state_text, workspace, branch, git_status and
+# $custom tokens (src/config/sidebar.rs:380-390). So the numbering plugin
+# reports the position as an $n token and this row draws it. The second row is
+# herdr's default, repeated because setting `rows` replaces the whole layout.
+# Renders as "● 1 · dotfiles": the " · " is herdr's fixed token separator, not
+# a choice made here. Before the plugin reports anything the token and its
+# separator simply disappear, so this is safe to have set on its own.
+[ui.sidebar.spaces]
+rows = [["state_icon", "$n", "workspace"], ["branch", "git_status"]]
 
 [ui.toast]
 # Ping the OS when a pi or claude pane finishes or needs input. Off by
