@@ -36,6 +36,14 @@ field the API returns. That field is a monotonic public id which diverges from
 position after closes and moves (`src/app/mod.rs:2312-2313`). Anything that
 numbers tabs must count positions and must not trust `number`.
 
+The tabs half rests on `herdr tab list` returning tabs in position order, so
+that was checked rather than assumed: both list paths walk `ws.tabs` by index
+and neither sorts (`src/app/api/tabs.rs:23-29` unfiltered, `290-300` filtered
+by `--workspace`). List order is position order. This mattered because the
+current session cannot tell the hypotheses apart — every tab in it happens to
+have `number == position`, so a list sorted by `number` would look identical
+today and silently misnumber after the first close-then-create.
+
 ## Verified before designing
 
 Run live against the running 0.9.1 server, not inferred:
@@ -123,6 +131,15 @@ So runs serialize through a `mkdir` lock in `HERDR_PLUGIN_STATE_DIR`, with a
 stale-lock timeout so a killed run cannot wedge the plugin. `mkdir`, not
 `flock`: macOS ships no `flock` binary.
 
+A run that cannot take the lock must **not** simply exit — that is a lost
+update. The holder read its snapshot before the newer event happened, so
+dropping the newer run leaves stale numbers on screen until some unrelated
+event happens to fire. Instead a contending run touches a `dirty` marker
+beside the lock and exits; the holder checks for `dirty` before releasing,
+and if it is set, clears it and reconciles once more. That is the payoff for
+reconciling instead of reacting to payloads: a burst of events collapses into
+at most one extra pass, and nothing is dropped.
+
 The spaces half needs no guard at all — `workspace.metadata_updated` is
 deliberately excluded from hook-eligible events
 (`src/api/schema/events.rs:351-357`), so reporting a token cannot wake the
@@ -137,9 +154,12 @@ plugin that reported it.
 | `renumber.sh --strip` | Remove every `^[0-9]+:` prefix and clear the `n` tokens. The undo. |
 | `renumber_test.sh` | Table-driven check of the pure label transform. No server. |
 
-`--strip` cannot restore auto-named status: a tab renamed once is custom-named
-for good. This is the second reason auto-named tabs are left untouched — with
-that rule, `--strip` is a genuine undo.
+`--strip` restores any name the plugin did not already corrupt. Two things it
+cannot undo: a tab renamed once is custom-named for good (there is no API to
+un-name one), which is the second reason auto-named tabs are left untouched;
+and a name that was eaten on the way in stays eaten — `12:30 standup` stamps
+to `1:30 standup` and strips to `30 standup`. Stripping is what destroys it,
+and it is unrecoverable.
 
 ## Config changes
 
@@ -210,7 +230,7 @@ Four layers, cheapest first. The first two carry no risk to the live session.
   (`endpoint_sidebar.rs:134`).
 - Tabs past 9 get numbered but are not reachable by `prefix+N`.
 - A name deliberately starting with digits and a colon (`12:30 standup`) has
-  its prefix eaten.
+  its prefix eaten, irreversibly — see `--strip` above.
 - Every tab the plugin touches becomes permanently custom-named in
   `session.json`. That also changes tab-bar styling (custom labels render
   bold when focused) and makes the agent sidebar show the tab token for
