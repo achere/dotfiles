@@ -48,3 +48,56 @@ desired_label() {
 if [[ ${RENUMBER_LIB_ONLY:-0} == 1 ]]; then
   return 0
 fi
+
+# --- talking to herdr -----------------------------------------------------
+
+# Plugin commands get HERDR_BIN_PATH injected; a hand-run does not.
+HERDR="${HERDR_BIN_PATH:-herdr}"
+SOURCE_ID="numbering"
+
+# Tab renames. Position is counted here rather than taken from the API's
+# `number` field on purpose: prefix+N resolves by POSITION in the
+# workspace-filtered list (src/client/shell/actions.rs:924), while `number` is
+# a monotonic public id that diverges from position after closes and moves.
+# `herdr tab list` returns tabs in position order - both list paths walk
+# ws.tabs by index and neither sorts (src/app/api/tabs.rs:23-29, 290-300).
+plan_tab_renames() {
+  local workspace tab_id label prev_workspace="" position=0 desired
+  while IFS=$'\t' read -r workspace tab_id label; do
+    if [[ $workspace != "$prev_workspace" ]]; then
+      position=0
+      prev_workspace=$workspace
+    fi
+    position=$((position + 1))
+    desired=$(desired_label "$position" "$label")
+    [[ $desired == "$label" ]] && continue
+    printf 'rename\t%s\t%s\n' "$tab_id" "$desired"
+  done < <("$HERDR" tab list | jq -r '.result.tabs[] | [.workspace_id, .tab_id, .label] | @tsv')
+}
+
+# Space numbers. The array index is the server's workspace order, which is what
+# the sidebar draws. Reported every run rather than diffed: metadata tokens are
+# runtime-only (src/persist/snapshot.rs:50 has no tokens field), so there is no
+# stored value to compare against, and reporting one cannot wake this plugin -
+# workspace.metadata_updated is excluded from hook events
+# (src/api/schema/events.rs:351-357).
+plan_space_tokens() {
+  "$HERDR" workspace list |
+    jq -r '.result.workspaces | to_entries[] | ["token", .value.workspace_id, (.key + 1)] | @tsv'
+}
+
+plan_actions() {
+  plan_tab_renames
+  plan_space_tokens
+}
+
+main() {
+  local actions
+  if [[ ${DRY_RUN:-0} == 1 ]]; then
+    actions=$(plan_actions)
+    [[ -n $actions ]] && printf '%s\n' "$actions"
+    return 0
+  fi
+}
+
+main "$@"
