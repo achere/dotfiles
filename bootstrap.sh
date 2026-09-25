@@ -18,7 +18,7 @@ brew install stow
 #    ~/.config/lazygit would put lazygit's state into a public repo. The same
 #    applies to ~/.config/herdr, which holds herdr.sock, herdr-client.sock,
 #    session.json and .plugins.lock - live sockets and session state.
-mkdir -p "$HOME/.config/tmux" "$HOME/.config/wezterm" "$HOME/.config/ghostty" \
+mkdir -p "$HOME/.config/tmux" "$HOME/.config/kitty" "$HOME/.config/ghostty" \
          "$HOME/.config/lazygit" "$HOME/.config/herdr"
 
 # 4. link the packages
@@ -29,8 +29,8 @@ cd "$DOTFILES"
 #    behind in ~/.config, dangling and invisible. -R clears those orphans. On a
 #    machine that has never been stowed the unstow half is a no-op, so this is
 #    also correct on a fresh install.
-stow -n -R -v tmux wezterm ghostty zsh lazygit starship herdr   # dry run first, always
-stow -R -v tmux wezterm ghostty zsh lazygit starship herdr
+stow -n -R -v tmux kitty ghostty zsh lazygit starship herdr   # dry run first, always
+stow -R -v tmux kitty ghostty zsh lazygit starship herdr
 
 # 5. everything the configs depend on
 brew bundle install --file="$DOTFILES/Brewfile"

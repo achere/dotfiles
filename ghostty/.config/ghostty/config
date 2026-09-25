@@ -1,13 +1,13 @@
-# Mirrors wezterm/.config/wezterm/wezterm.lua — keep the two in sync.
+# Mirrors kitty/.config/kitty/kitty.conf — keep the two in sync.
 
-# color_scheme = "Dracula"
+# background/foreground/color0-15 in kitty.conf
 theme = Dracula
 
-# font = wezterm.font("FiraCode Nerd Font Mono"); font_size = 15.0
+# font_family / font_size in kitty.conf
 font-family = FiraCode Nerd Font Mono
 font-size = 15
 
-# config.colors.cursor_bg / cursor_fg
+# cursor / cursor_text_color in kitty.conf
 cursor-color = #D173E2
 cursor-text = #000000
 cursor-style = block
@@ -19,7 +19,7 @@ cursor-style-blink = false
 # drop the cursor one.
 shell-integration-features = no-cursor
 
-# window_decorations = "RESIZE": no titlebar, window stays resizable.
+# hide_window_decorations titlebar-only: no titlebar, window stays resizable.
 macos-titlebar-style = hidden
 
 # Without this, Option is consumed as a dead-key/compose input instead of

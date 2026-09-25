@@ -22,6 +22,6 @@ brew "jq"                           # herdr/.config/herdr/config.toml pane-close
 brew "ripgrep"
 brew "tree-sitter-cli"
 
-cask "wezterm"                      # wezterm.lua
+cask "kitty"                        # kitty.conf
 cask "ghostty"                      # ghostty config
-cask "font-fira-code-nerd-font"     # wezterm.lua / ghostty config font
+cask "font-fira-code-nerd-font"     # kitty.conf / ghostty config font
