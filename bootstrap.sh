@@ -64,24 +64,17 @@ mkdir -p "$HOME/.nvm"
 # 8. tmux plugins: tmux.conf clones tpm itself on first launch. If the
 #    plugins do not appear, press prefix + I once.
 
-# 9. herdr's agent integrations report pi/claude lifecycle state to the herdr
-#    sidebar and OS notifications. They are not symlinked: both write into
-#    gitignored machine-local directories, and claude's install also appends a
-#    hooks key to ~/.claude/settings.json. Both commands exit 1 when the target
-#    directory is missing ("install pi first"), which would abort this script
-#    under `set -e` on a machine where neither agent has been run yet - hence
-#    the mkdir, which makes them succeed unconditionally and keeps this file
-#    free of `command -v` guards.
-mkdir -p "$HOME/.claude" "$HOME/.pi/agent/extensions"
-herdr integration install pi
-herdr integration install claude
-
-# 10. the numbering plugin keeps each tab's number in its name and reports
-#     each space's number to the sidebar. Like the integrations above, stow
-#     alone does not arm it: herdr's plugin registry lives at
-#     ~/.config/herdr/plugins.json, which is machine-local and gitignored
-#     alongside the sockets and session.json, so a fresh machine has to be
-#     told about the plugin explicitly. The plugin's files themselves DO
-#     arrive by stow, under herdr/.config/herdr/plugins/numbering. Linking is
-#     idempotent, so this doubles as the update path, like the restow above.
+# 9. the numbering plugin keeps each tab's number in its name and reports
+#    each space's number to the sidebar. Like the integrations above, stow
+#    alone does not arm it: herdr's plugin registry lives at
+#    ~/.config/herdr/plugins.json, which is machine-local and gitignored
+#    alongside the sockets and session.json, so a fresh machine has to be
+#    told about the plugin explicitly. The plugin's files themselves DO
+#    arrive by stow, under herdr/.config/herdr/plugins/numbering. Linking is
+#    idempotent, so this doubles as the update path, like the restow above.
 herdr plugin link "$HOME/.config/herdr/plugins/numbering"
+
+# 10. agent config (Claude Code rules, skills, settings, hooks, launchd job)
+#     lives in its own repo. After this script: clone it to ~/agents and run
+#     `just setup` there. It owns every agent integration install, including
+#     herdr's - not this script.

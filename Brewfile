@@ -17,6 +17,9 @@ brew "stow"                         # bootstrap
 brew "go"                           # nvim go tooling; see bootstrap step 6
 brew "herdr"                        # herdr/.config/herdr/config.toml
 brew "jq"                           # herdr/.config/herdr/config.toml pane-close popup
+brew "just"                         # ~/agents justfile
+brew "rtk"                          # Claude Code Bash hook; ~/agents `just integrations`
+brew "bun"                          # ccstatusline; ~/agents `just integrations`
 
 # --- explicitly requested ---
 brew "ripgrep"
