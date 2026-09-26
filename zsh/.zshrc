@@ -37,6 +37,7 @@ export KUBE_EDITOR='nvim' # Kubernetes editor
 
 alias lg='lazygit'
 alias k='kubectl'
+alias ls='ls -lah --color=auto'
 
 # Heroku CLI complains without this
 export NODE_EXTRA_CA_CERTS="$HOMEBREW_PREFIX/etc/ca-certificates/cert.pem"
