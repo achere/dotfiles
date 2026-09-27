@@ -65,16 +65,11 @@ mkdir -p "$HOME/.nvm"
 #    plugins do not appear, press prefix + I once.
 
 # 9. the numbering plugin keeps each tab's number in its name and reports
-#    each space's number to the sidebar. Like the integrations above, stow
-#    alone does not arm it: herdr's plugin registry lives at
-#    ~/.config/herdr/plugins.json, which is machine-local and gitignored
-#    alongside the sockets and session.json, so a fresh machine has to be
-#    told about the plugin explicitly. The plugin's files themselves DO
-#    arrive by stow, under herdr/.config/herdr/plugins/numbering. Linking is
-#    idempotent, so this doubles as the update path, like the restow above.
+#    each space's number to the sidebar. Stow alone does not arm it: herdr's
+#    plugin registry lives at ~/.config/herdr/plugins.json, which is
+#    machine-local and gitignored alongside the sockets and session.json, so a
+#    fresh machine has to be told about the plugin explicitly. The plugin's
+#    files themselves DO arrive by stow, under
+#    herdr/.config/herdr/plugins/numbering. Linking is idempotent, so this
+#    doubles as the update path, like the restow above.
 herdr plugin link "$HOME/.config/herdr/plugins/numbering"
-
-# 10. agent config (Claude Code rules, skills, settings, hooks, launchd job)
-#     lives in its own repo. After this script: clone it to ~/agents and run
-#     `just setup` there. It owns every agent integration install, including
-#     herdr's - not this script.
