@@ -58,7 +58,6 @@ brew "gromgit/fuse/ntfs-3g-mac"
 
 cask "calibre"
 cask "claude"
-cask "claude-code"
 cask "cmux"
 cask "commander-one"
 cask "dbeaver-community"

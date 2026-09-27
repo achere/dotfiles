@@ -43,7 +43,8 @@ brew bundle install --file="$DOTFILES/Brewfile"
 #    makes bootstrap the source of truth. None of these are in Homebrew except
 #    gomodifytags, gotests and delve; installing that subset with brew would put
 #    a second copy in /opt/homebrew/bin that ~/go/bin shadows anyway, since
-#    .zshrc puts $HOME/go/bin first on PATH. So: one mechanism, go install.
+#    .zshrc puts $HOME/go/bin ahead of Homebrew on PATH. So: one mechanism,
+#    go install.
 go_tools=(
   github.com/koron/iferr@latest
   github.com/josharian/impl@latest

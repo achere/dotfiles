@@ -1,7 +1,14 @@
-export PATH="$HOME/.local/bin:$HOME/go/bin:$PATH"
+# Nested shells (herdr, tmux panes) re-run this file; keep each PATH entry once.
+typeset -U path
 
 # setup brew env
 eval "$(/opt/homebrew/bin/brew shellenv)"
+
+# After brew shellenv, which prepends its own dirs: tools installed outside
+# Homebrew (native claude in ~/.local/bin, `go install`) must win over any
+# Homebrew copy of the same name. The array form is what applies -U: a plain
+# PATH="..." assignment keeps duplicates.
+path=("$HOME/.local/bin" "$HOME/go/bin" $path)
 
 # to make apps look for home config instead of "Application Support" busines
 export XDG_CONFIG_HOME="$HOME/.config"
