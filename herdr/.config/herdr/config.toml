@@ -116,6 +116,17 @@ focus_agent = "prefix+alt+1..9"
 pane_borders = "always"
 pane_outer_borders = true
 
+# Machine-wide CPU and RAM at the right edge of the tab bar. herdr has no
+# global sidebar header (the per-space `$usage` plugins only report per
+# workspace, and the space-usage plugin's "total" sums just the processes
+# inside herdr panes), so this runs sysload.sh, which reads the whole
+# machine from `top`. The script takes ~2s (two top samples, one second
+# apart), hence the 4s timeout inside a 5s interval; herdr never blocks
+# rendering on it and clears the entry if it fails.
+tab_bar_right = [
+  { type = "command", command = "~/.config/herdr/sysload.sh", interval_seconds = 5, timeout_seconds = 4 },
+]
+
 # Agent panel ordering: "spaces" groups agents by workspace, "priority" orders
 # them by which one wants attention. Chosen in herdr's own Settings screen -
 # but that screen does NOT write here. It writes
@@ -136,8 +147,15 @@ agent_panel_sort = "priority"
 # Renders as "● 1 · dotfiles": the " · " is herdr's fixed token separator, not
 # a choice made here. Before the plugin reports anything the token and its
 # separator simply disappear, so this is safe to have set on its own.
+#
+# The third row is the space-usage plugin's per-space CPU/RAM readout
+# (ezcorp-org/herdr-pc-ram-and-cpu-usage-overlay); the machine-wide figure is
+# tab_bar_right above. The plugin can append this row itself, but it does so
+# by temp-file rename, which would replace this stowed symlink with a plain
+# file. It skips the edit when `$usage` is already in the table, so the row is
+# written here by hand to keep the link intact.
 [ui.sidebar.spaces]
-rows = [["state_icon", "$n", "workspace"], ["branch", "git_status"]]
+rows = [["state_icon", "$n", "workspace"], ["branch", "git_status"], ["$usage"]]
 
 [ui.toast]
 # Ping the OS when a pi or claude pane finishes or needs input. Off by
