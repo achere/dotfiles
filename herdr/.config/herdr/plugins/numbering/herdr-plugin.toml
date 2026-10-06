@@ -30,6 +30,18 @@ command = ["bash", "renumber.sh"]
 on = "tab.moved"
 command = ["bash", "renumber.sh"]
 
+# Closing or exiting a tab's last pane removes the tab WITHOUT a tab.closed
+# event (seen on herdr 0.9.2: `herdr pane close`, and a shell that exits), so
+# the tabs after it kept their old numbers. A pane closing in a tab that
+# survives costs one run that changes nothing.
+[[events]]
+on = "pane.closed"
+command = ["bash", "renumber.sh"]
+
+[[events]]
+on = "pane.exited"
+command = ["bash", "renumber.sh"]
+
 # Fires even when a rename changed nothing (src/app/api/tabs.rs:158-168), so
 # this hook re-triggers itself unless the script skips correct labels. It does.
 [[events]]
