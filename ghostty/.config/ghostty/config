@@ -7,9 +7,7 @@ theme = Dracula
 font-family = FiraCode Nerd Font Mono
 font-size = 15
 
-# cursor / cursor_text_color in kitty.conf
-cursor-color = #D173E2
-cursor-text = #000000
+# cursor_shape / cursor_blink_interval in kitty.conf; colours come from the theme
 cursor-style = block
 cursor-style-blink = false
 
