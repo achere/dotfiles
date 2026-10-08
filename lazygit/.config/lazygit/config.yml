@@ -1,3 +1,22 @@
+# Dracula palette, except the active border: One Dark blue (#61afef) to match
+# herdr's borders. Lazygit's default selection is ANSI blue, which Dracula
+# maps to bright purple (#bd93f9).
+gui:
+  theme:
+    activeBorderColor: ['#61afef', bold]
+    inactiveBorderColor: ['#6272a4']
+    searchingActiveBorderColor: ['#f1fa8c', bold]
+    optionsTextColor: ['#8be9fd']
+    selectedLineBgColor: ['#44475a']
+    selectedRangeBgColor: ['#44475a']
+    inactiveViewSelectedLineBgColor: ['default']
+    cherryPickedCommitFgColor: ['#bd93f9']
+    cherryPickedCommitBgColor: ['#44475a']
+    markedBaseCommitFgColor: ['#8be9fd']
+    markedBaseCommitBgColor: ['#44475a']
+    unstagedChangesColor: ['#ff5555']
+    defaultFgColor: ['default']
+
 customCommands:
   - key: 'b'
     command: "git branch -vv | grep ': gone]' | awk '{print $1}' | xargs git branch -D"
