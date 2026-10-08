@@ -2,4 +2,4 @@
 disabled = false
 format = "[$symbol$context(:$namespace)]($style) "
 symbol = "☸ "
-style = "bold fg:blue"
+style = "bold fg:111"
