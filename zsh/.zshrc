@@ -35,6 +35,7 @@ export NVM_DIR="$HOME/.nvm"
 
 source <(kubectl completion zsh)
 source <(herdr completion zsh)
+source <(bd completion zsh)
 
 source "$HOMEBREW_PREFIX/opt/zsh-autosuggestions/share/zsh-autosuggestions/zsh-autosuggestions.zsh"
 
