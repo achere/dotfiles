@@ -23,3 +23,6 @@ macos-titlebar-style = hidden
 # Without this, Option is consumed as a dead-key/compose input instead of
 # acting as Alt, so alt+backspace (delete word) and similar keybinds don't fire.
 macos-option-as-alt = true
+
+# More line spacing.
+adjust-cell-height = 20%
