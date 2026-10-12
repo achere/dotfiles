@@ -1,0 +1,10 @@
+[user]
+	name = Alexander Chereshnev
+	email = chethelesser@gmail.com
+[init]
+	defaultBranch = main
+[push]
+	autoSetupRemote = true
+# Machine-local, untracked settings (e.g. tool-specific sections).
+[include]
+	path = ~/.gitconfig.local

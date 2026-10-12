@@ -29,8 +29,8 @@ cd "$DOTFILES"
 #    behind in ~/.config, dangling and invisible. -R clears those orphans. On a
 #    machine that has never been stowed the unstow half is a no-op, so this is
 #    also correct on a fresh install.
-stow -n -R -v tmux kitty ghostty zsh lazygit starship herdr   # dry run first, always
-stow -R -v tmux kitty ghostty zsh lazygit starship herdr
+stow -n -R -v tmux kitty ghostty zsh lazygit starship herdr git   # dry run first, always
+stow -R -v tmux kitty ghostty zsh lazygit starship herdr git
 
 # 5. everything the configs depend on
 brew bundle install --file="$DOTFILES/Brewfile"
