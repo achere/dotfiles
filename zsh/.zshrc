@@ -76,6 +76,10 @@ accept-line-or-continue() {
   fi
 }
 zle -N accept-line-or-continue
+# autosuggestions wraps unknown widgets as "modify" widgets, which put the
+# suggestion back after accept-line cleared it - it then lingers, unstyled
+# (white), in the submitted line. Mark this one as clearing.
+ZSH_AUTOSUGGEST_CLEAR_WIDGETS+=(accept-line-or-continue)
 bindkey -M viins '^M' accept-line-or-continue
 bindkey -M vicmd '^M' accept-line-or-continue
 
