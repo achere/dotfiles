@@ -34,6 +34,7 @@ export NVM_DIR="$HOME/.nvm"
 [ -s "$HOMEBREW_PREFIX/opt/nvm/etc/bash_completion.d/nvm" ] && \. "$HOMEBREW_PREFIX/opt/nvm/etc/bash_completion.d/nvm"  # This loads nvm bash_completion
 
 source <(kubectl completion zsh)
+command -v minikube >/dev/null && source <(minikube completion zsh)  # minikube is in Brewfile.extras
 source <(herdr completion zsh)
 source <(bd completion zsh)
 
