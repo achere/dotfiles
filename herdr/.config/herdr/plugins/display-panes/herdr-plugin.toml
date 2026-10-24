@@ -1,0 +1,39 @@
+# herdr display-panes plugin - tmux `prefix q`. A plugin rather than a plain
+# `type = "popup"` keybinding because the frame must be built before the
+# popup opens (see the header of display-panes.pl), and only a plugin can
+# open a popup from a script: there is no API to open one with an arbitrary
+# command.
+#
+# Commands are argv arrays run without a shell, and their working directory is
+# this plugin directory, so "display-panes.pl" resolves without a path.
+id = "dotfiles.display-panes"
+name = "Display panes"
+version = "0.1.0"
+min_herdr_version = "0.9.1"
+description = "Number the focused tab's panes and focus one by digit, like tmux prefix q"
+platforms = ["macos"]
+
+# Bound to prefix+q in config.toml.
+[[actions]]
+id = "show"
+title = "Display panes"
+command = ["perl", "display-panes.pl", "show"]
+
+# Opened only by `show`. 100% covers exactly the tab's pane area, so the
+# repainted panes land on the cells they occupy underneath.
+#
+# The title becomes the popup's border title, and an empty one turns into
+# "popup" (src/server/client_shell.rs). A zero-width space survives herdr's
+# trim (it is not whitespace) and draws nothing.
+#
+# The command prints the prepared frame before perl starts, because the
+# popup's first render must already contain it; cat is out in ~3 ms. stty
+# goes first: a digit typed before pick gets to its own raw-mode switch was
+# held in the line buffer and lost, or echoed onto the frame.
+[[panes]]
+id = "picker"
+title = "​"
+placement = "popup"
+width = "100%"
+height = "100%"
+command = ["/bin/sh", "-c", "stty -icanon -echo min 1 time 0; cat \"$DISPLAY_PANES_STATE/frame\"; exec perl display-panes.pl pick"]

@@ -40,13 +40,10 @@ rename_tab = "prefix+comma"      # tmux , rename-window
 close_tab  = ""
 
 # tmux `prefix q` is display-panes: numbers the panes, press one to jump.
-# herdr's nearest equivalent is NAVIGATE mode, reached via goto - an overlay
-# moved with h/j/k/l and the arrows, 1-9 reserved for selection, esc to back
-# out. Not an exact match: herdr numbers agents in its sidebar, not panes,
-# so this is the closest equivalent in access pattern rather than the same
-# thing. prefix+q was free because detach moved to prefix+d above; herdr's
-# default prefix+g stays bound too, so goto now answers to both.
-goto = "prefix+q"
+# herdr has no such feature, so prefix+q runs a plugin that rebuilds it - see
+# the prefix+q binding at the end of this file. prefix+q was free because detach
+# moved to prefix+d above. goto (NAVIGATE mode, which numbers agents, not
+# panes) stays on its default prefix+g.
 
 # NAVIGATE mode splits movement into two separate bindings: these move
 # through the workspace/session list, while navigate_pane_left/down/up/right
@@ -211,6 +208,19 @@ width = "50%"
 height = "20%"
 command = '''bash -c 't=$(herdr api snapshot | jq -r .result.snapshot.focused_tab_id); l=$(herdr tab get "$t" | jq -r .result.tab.label); n=$(herdr pane list | jq -r "[.result.panes[]|select(.tab_id==\"$t\")]|length"); printf "Close tab %s (%s panes)? [y/N] " "$l" "$n"; read -n 1 -r a; echo; case "$a" in [yY]) herdr tab close "$t" ;; esac' '''
 
+# tmux `prefix q` (display-panes), which herdr does not have. The
+# display-panes plugin (plugins/display-panes) repaints each pane's screen in
+# a full-size popup with a big digit on it: 1-9 focuses that pane, any other
+# key or 3 s of nothing closes it. A zoomed tab is unzoomed while the numbers
+# show and zoomed again unless another pane is picked.
+[[keys.command]]
+key = "prefix+q"
+type = "plugin_action"
+command = "dotfiles.display-panes.show"
+description = "display panes"
+
+# plugins/display-panes/display-panes.pl repaints pane borders and scrollbars
+# with one-dark's colours (%PALETTE there); change them too if this changes.
 [theme]
 name = "one-dark"
 auto_switch = false

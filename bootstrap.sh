@@ -74,3 +74,6 @@ mkdir -p "$HOME/.nvm"
 #    herdr/.config/herdr/plugins/numbering. Linking is idempotent, so this
 #    doubles as the update path, like the restow above.
 herdr plugin link "$HOME/.config/herdr/plugins/numbering"
+# The display-panes plugin (prefix+q, tmux display-panes) needs the same
+# explicit link, for the same reason.
+herdr plugin link "$HOME/.config/herdr/plugins/display-panes"
