@@ -2,7 +2,8 @@
 
 **Date:** 2026-10-25
 **Status:** design agreed in chat 2026-10-25; this spec awaits the user's
-review. Not implemented.
+review. Not implemented. Revised 2026-10-25: the whole history is read at
+open, not on demand (the user rejected reading on demand).
 
 Measured on herdr 0.9.5 by an agent, against an isolated named session (the
 probes are throwaway, not in the repo). The display-panes checks of the
@@ -71,44 +72,55 @@ What the user asked for:
   - `ctrl+v` takes the same columns from each row, trailing blanks dropped,
     one line per row, wrapped rows not joined (tmux does the same).
 - **History:** the pane's whole history, up to herdr's scrollback limit
-  (`scrollback_limit_bytes`, 10 MB). It is frozen when copy mode opens, as
-  in tmux: output that arrives later does not show.
-- **Alternate-screen apps** (less, vim, TUI agents): the screen only, as in
-  tmux and herdr's own copy mode. herdr keeps no history for them
-  (`max_offset_from_bottom` is 0, measured with less).
+  (`scrollback_limit_bytes`, 10 MB), all of it read when copy mode opens.
+  Nothing is read on demand later. Up to 1000 rows come in one read; a
+  longer history is read in one pass right after the popup appears (see
+  Design), and keys typed during that pass apply when it ends. On
+  2026-10-25 the user's largest pane history was 331 rows.
+- The history is frozen when copy mode opens, as in tmux: output that
+  arrives later does not show.
+- **Alternate-screen apps** (less, vim, and the Claude Code and pi panes):
+  the screen only, as in tmux and herdr's own copy mode. herdr keeps no
+  history for them (`max_offset_from_bottom` is 0, measured with less and
+  in all of the user's Claude and pi panes). Their earlier conversation is
+  deferred (see Out of scope).
 - When Copy mode, Settings or another modal is open, herdr refuses the popup
   (`ui_busy`) and nothing happens (as for display-panes).
 
 ## Design
 
-**Reading history.** `pane.read --source recent` stops at 1000 rows
-(`lines.min(1000)`, `src/app/api_helpers.rs`). Instead, the viewer reads a
-page at a time: `pane.scroll` moves the pane under the popup to an offset,
-then `pane.read --source visible --format ansi` returns one screen of rows.
-The popup covers the pane, so this scrolling does not show.
-- Speed: 50 pages back to back took 14 ms (0.3 ms a page), measured.
-- Row numbers: a row's absolute number is the one herdr's own copy mode uses
-  (`src/client/shell/copy_mode.rs`): page top = `max_offset_from_bottom -
-  offset_from_bottom`, both taken from the `pane.scroll` reply, because new
-  output moves the offset (50 became 56 after 6 rows of output, measured).
-  A page is kept only if `max_offset_from_bottom` is the same in a
-  `pane.get` after the read. Otherwise it is read again.
+**Reading history.** All of it is read once, when the viewer starts,
+before it handles a key.
+- **The last 1000 rows:** one `pane.read --source recent --format ansi
+  --lines 1000`. herdr returns at most 1000 rows (`lines.min(1000)`,
+  `src/app/api_helpers.rs`). 0.6 ms for 1000 rows (55 KB), measured.
+- **Older rows**, only when the history is longer than 1000 rows: read
+  screen by screen in one pass. `pane.scroll` moves the pane under the
+  popup to an offset, then `pane.read --source visible --format ansi`
+  returns that screen. The popup covers the pane, so the scrolling does not
+  show. This cannot run before the popup opens: there it would show.
+  Measured: the 9004 older rows of a 10,000-row history in 215 screens,
+  64 ms, every row in its right place.
+- **Row numbers:** a row's absolute number is the one herdr's own copy mode
+  uses (`src/client/shell/copy_mode.rs`): screen top =
+  `max_offset_from_bottom - offset_from_bottom`, both from the `pane.scroll`
+  reply, because new output moves the offset (50 became 56 after 6 rows of
+  output, measured). For the `recent` read, the history length comes from a
+  `pane.get` before and after it. The same applies to each screen: if
+  `max_offset_from_bottom` changed between the two, it is read again.
 - The history ends at the last row there was when copy mode opened; rows
-  added later are never read.
-- Rows are kept in a cache keyed by absolute row. A page is read when the
-  cursor or view moves to rows not yet read, on `gg`, and while a search
-  runs past the rows already read; the bottom row shows `searching…` until
-  the search is done.
-- Restore: before the popup closes, the pane goes back to its offset. If
+  added later are dropped.
+- **Restore:** before the popup closes, the pane goes back to its offset. If
   output arrived meanwhile, the offset grows by the same number of rows, so
   the same rows are in view; a pane that was at the bottom stays at the
   bottom.
-- No `pane.scroll` at all when `max_offset_from_bottom` is 0. In an
-  alternate-screen app with mouse reporting a scroll can become wheel
-  input to the app.
-- If herdr drops the oldest history (at its byte limit) while copy mode is
-  open, pages read after that are off by the dropped rows. Accepted: it
-  needs a working pane near 10 MB of history.
+- There is no `pane.scroll` when the history fits in 1000 rows. In
+  particular, there is none in an alternate-screen app
+  (`max_offset_from_bottom` 0), where a scroll can become wheel input to
+  the app.
+- If herdr drops the oldest history (at its byte limit) during the pass,
+  screens read after that are off by the dropped rows. Accepted: it needs
+  a working pane near 10 MB of history.
 
 **Copying.**
 - `v` and `V` call `pane.selection.read {pane_id, anchor, cursor}` with
@@ -117,10 +129,10 @@ The popup covers the pane, so this scrolling does not show.
   edge (`selection_unavailable`: column 131 of a 132-cell pane was refused,
   column 50 of an empty row was accepted). So the end column is clamped to
   the end of that row's text. An empty result is an empty copy.
-- `ctrl+v` uses the cached rows' plain text.
+- `ctrl+v` uses the rows' plain text.
 - The text goes to `pbcopy`.
 
-**Search** runs in the viewer over the cached rows' plain text. herdr's
+**Search** runs in the viewer over the rows' plain text. herdr's
 `pane.copy_search` searches all history in the server, but it needs the
 pane's current `content_revision` (`pane.copy_motion` returns it). Any
 output from the pane makes that value stale, so on a working pane the search
@@ -147,9 +159,10 @@ the cursor cell in reverse video and hides the terminal cursor.
 
 In a zoomed tab the frame has the zoomed pane only, on the whole area. The
 popup command is `stty -icanon -echo min 1 time 0; cat frame; exec perl
-copy-mode.pl run`, so a key typed early is not lost. The viewer starts from the focused
-pane's visible rows and scroll numbers, which open saved with the frame. It
-needs no read before the first key.
+copy-mode.pl run`, so a key typed early is not lost. The viewer gets the
+focused pane's visible rows and scroll numbers from files that open saved
+with the frame, then reads the history (above) before it handles the first
+key.
 
 **Drawing after a key:** the focused pane's rows only, in one synchronized
 update (DEC 2026). Other panes stay as the first frame drew them.
@@ -193,7 +206,8 @@ actions `display-panes` and `copy-mode`, and the popup panes `picker` and
   - search: smartcase, `n` / `N`, wrapping;
   - rectangle text;
   - the `pane.selection.read` request for `v` and `V`, end column clamped;
-  - which offsets a row range needs, and the offset restored after output.
+  - the offsets that read the rows older than the last 1000, and the offset
+    restored after output.
 - `perl display-panes.t` passes after the move to `Panes.pm`.
 - With real keys, in the pty harness on an isolated session:
   - the first frame equals the pane except the number column and cursor, and
@@ -201,8 +215,9 @@ actions `display-panes` and `copy-mode`, and the popup panes `picker` and
   - `5k` moves the cursor row and the numbers;
   - `v e y` and `V y` on a wrapped row copy the expected text (the harness
     saves and restores the clipboard);
-  - `gg` on a 3000-row history reaches row 1, and the pane's scroll offset
-    is back afterwards;
+  - on a 10,000-row history: `gg` reaches row 1, a key typed during the
+    read applies after it, and the pane's scroll offset is back afterwards;
+  - a pane under 1000 rows gets no `pane.scroll`;
   - a zoomed tab stays zoomed;
   - less on the alternate screen shows its screen and sends no scroll;
   - Esc, `q` and `y` close the popup.
@@ -210,6 +225,14 @@ actions `display-panes` and `copy-mode`, and the popup panes `picker` and
 
 ## Out of scope
 
+- Deferred by the user: the earlier conversation of Claude Code and pi
+  panes. They draw on the alternate screen, so herdr holds only their
+  screen. herdr can collect more by scrolling an idle agent with wheel
+  events (`src/server/alt_screen_read.rs`), but only as text with no
+  colours.
+- Raising herdr's 1000-row read limit upstream, which would remove the
+  screen-by-screen pass. An upstream issue or PR is public, so it needs the
+  user's approval first.
 - Mouse selection; copying with colours.
 - `f F t T ; ,`, `%`, marks, text objects, `*` / `#`, append, copy-pipe.
 - Hiding or moving the number column.
