@@ -1,8 +1,22 @@
 # Nested shells (herdr, tmux panes) re-run this file; keep each PATH entry once.
 typeset -U path
 
-# setup brew env
-eval "$(/opt/homebrew/bin/brew shellenv)"
+# setup brew env. The output of `brew shellenv` is cached, since running brew
+# costs ~20 ms per shell. The cache is rebuilt when a brew update changes the
+# script that prints it, or on every start if that script ever moves.
+brew_env=$HOME/.cache/zsh/brew-shellenv.zsh
+brew_src=/opt/homebrew/Library/Homebrew/cmd/shellenv.sh
+if [[ ! -s $brew_env || ! -e $brew_src || $brew_src -nt $brew_env ]]; then
+  mkdir -p ${brew_env:h}
+  # A fixed PATH and shell name, so the cache never depends on the shell that
+  # built it: shellenv prints nothing when PATH already starts with brew's dirs,
+  # and otherwise guesses the shell from its parent process. Written aside, then
+  # moved: shells starting together never read half a file.
+  PATH=/usr/bin:/bin:/usr/sbin:/sbin /opt/homebrew/bin/brew shellenv zsh >| $brew_env.$$ &&
+    [[ -s $brew_env.$$ ]] && mv -f $brew_env.$$ $brew_env || rm -f $brew_env.$$
+fi
+source $brew_env
+unset brew_env brew_src
 
 # After brew shellenv, which prepends its own dirs: tools installed outside
 # Homebrew (native claude in ~/.local/bin, `go install`) must win over any
@@ -23,20 +37,20 @@ eval "$(starship init zsh)"
 
 eval "$(zoxide init zsh)"
 
+# kubectl, herdr, bd and minikube need no setup here: their Homebrew formulae
+# install completion scripts into site-functions, which `brew shellenv` puts on
+# fpath, so compinit loads each one on its first Tab.
 autoload -Uz compinit
 compinit
 
-# Must stay BELOW compinit. nvm's completion file runs its own compinit when it
-# finds none, then registers via bashcompinit - and a second compinit afterwards
-# resets the completion table and silently drops that registration.
-export NVM_DIR="$HOME/.nvm"
-[ -s "$HOMEBREW_PREFIX/opt/nvm/nvm.sh" ] && \. "$HOMEBREW_PREFIX/opt/nvm/nvm.sh"  # This loads nvm
-[ -s "$HOMEBREW_PREFIX/opt/nvm/etc/bash_completion.d/nvm" ] && \. "$HOMEBREW_PREFIX/opt/nvm/etc/bash_completion.d/nvm"  # This loads nvm bash_completion
-
-source <(kubectl completion zsh)
-command -v minikube >/dev/null && source <(minikube completion zsh)  # minikube is in Brewfile.extras
-source <(herdr completion zsh)
-source <(bd completion zsh)
+# Except minikube's script, which is bash completion behind a shim: loaded from
+# fpath, its first Tab only registers it (via bashcompinit) and completes
+# nothing. Sourcing it up front costs ~25 ms per start, so this stub sources it
+# on the first Tab and hands that Tab to the completer it registered.
+_minikube() {
+  source "$HOMEBREW_PREFIX/share/zsh/site-functions/_minikube"
+  [[ $_comps[minikube] != _minikube ]] && eval "$_comps[minikube]"
+}
 
 source "$HOMEBREW_PREFIX/opt/zsh-autosuggestions/share/zsh-autosuggestions/zsh-autosuggestions.zsh"
 

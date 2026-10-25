@@ -2,7 +2,6 @@
 brew "fzf"
 brew "starship"
 brew "zoxide"
-brew "nvm"
 brew "kubernetes-cli"               # provides kubectl
 brew "neovim"                       # KUBE_EDITOR='nvim'
 brew "lazygit"                      # alias lg

@@ -58,14 +58,10 @@ for tool in "${go_tools[@]}"; do
   go install "$tool"
 done
 
-# 7. NVM_DIR must exist. Brew's nvm.sh wrapper creates it on load, so this is
-#    belt-and-braces rather than strictly required.
-mkdir -p "$HOME/.nvm"
-
-# 8. tmux plugins: tmux.conf clones tpm itself on first launch. If the
+# 7. tmux plugins: tmux.conf clones tpm itself on first launch. If the
 #    plugins do not appear, press prefix + I once.
 
-# 9. the numbering plugin keeps each tab's number in its name and reports
+# 8. the numbering plugin keeps each tab's number in its name and reports
 #    each space's number to the sidebar. Stow alone does not arm it: herdr's
 #    plugin registry lives at ~/.config/herdr/plugins.json, which is
 #    machine-local and gitignored alongside the sockets and session.json, so a
