@@ -20,6 +20,7 @@ brew "jq"                           # herdr/.config/herdr/config.toml pane-close
 # --- explicitly requested ---
 brew "ripgrep"
 brew "tree-sitter-cli"
+brew "worktrunk"                    # git worktree manager (wt)
 
 cask "kitty"                        # kitty.conf
 cask "ghostty"                      # ghostty config
