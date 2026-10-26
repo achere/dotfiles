@@ -3,7 +3,9 @@
 **Date:** 2026-10-24
 **Status:** implemented 2026-10-24 — `herdr/.config/herdr/plugins/display-panes/`
 (plugin `dotfiles.display-panes`), the `prefix+q` binding in `config.toml`,
-the `herdr plugin link` line in `bootstrap.sh`.
+the `herdr plugin link` line in `bootstrap.sh`. Moved 2026-10-25 to
+`plugins/panes/` (plugin `dotfiles.panes`, shared code in `Panes.pm`),
+alongside the copy mode of `2026-10-25-herdr-copy-mode-design.md`.
 
 CONFIRMED by the user pressing keys: the final version below works (an
 earlier version, drawing inside the popup, worked but flashed).

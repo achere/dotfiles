@@ -208,19 +208,19 @@ width = "50%"
 height = "20%"
 command = '''bash -c 't=$(herdr api snapshot | jq -r .result.snapshot.focused_tab_id); l=$(herdr tab get "$t" | jq -r .result.tab.label); n=$(herdr pane list | jq -r "[.result.panes[]|select(.tab_id==\"$t\")]|length"); printf "Close tab %s (%s panes)? [y/N] " "$l" "$n"; read -n 1 -r a; echo; case "$a" in [yY]) herdr tab close "$t" ;; esac' '''
 
-# tmux `prefix q` (display-panes), which herdr does not have. The
-# display-panes plugin (plugins/display-panes) repaints each pane's screen in
-# a full-size popup with a big digit on it: 1-9 focuses that pane, any other
-# key or 3 s of nothing closes it. A zoomed tab is unzoomed while the numbers
-# show and zoomed again unless another pane is picked.
+# tmux `prefix q` (display-panes), which herdr does not have. The panes
+# plugin (plugins/panes) repaints each pane's screen in a full-size popup with
+# a big digit on it: 1-9 focuses that pane, any other key or 3 s of nothing
+# closes it. A zoomed tab is unzoomed while the numbers show and zoomed again
+# unless another pane is picked.
 [[keys.command]]
 key = "prefix+q"
 type = "plugin_action"
-command = "dotfiles.display-panes.show"
+command = "dotfiles.panes.display-panes"
 description = "display panes"
 
-# plugins/display-panes/display-panes.pl repaints pane borders and scrollbars
-# with one-dark's colours (%PALETTE there); change them too if this changes.
+# plugins/panes/Panes.pm repaints pane borders and scrollbars with one-dark's
+# colours (%PALETTE there); change them too if this changes.
 [theme]
 name = "one-dark"
 auto_switch = false

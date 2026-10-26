@@ -1,13 +1,13 @@
-# herdr display-panes plugin - tmux `prefix q`. A plugin rather than a plain
-# `type = "popup"` keybinding because the frame must be built before the
+# herdr panes plugin - tmux `prefix q` (display-panes). A plugin rather than a
+# plain `type = "popup"` keybinding because the frame must be built before the
 # popup opens (see the header of display-panes.pl), and only a plugin can
 # open a popup from a script: there is no API to open one with an arbitrary
 # command.
 #
 # Commands are argv arrays run without a shell, and their working directory is
 # this plugin directory, so "display-panes.pl" resolves without a path.
-id = "dotfiles.display-panes"
-name = "Display panes"
+id = "dotfiles.panes"
+name = "Panes"
 version = "0.1.0"
 min_herdr_version = "0.9.1"
 description = "Number the focused tab's panes and focus one by digit, like tmux prefix q"
@@ -15,7 +15,7 @@ platforms = ["macos"]
 
 # Bound to prefix+q in config.toml.
 [[actions]]
-id = "show"
+id = "display-panes"
 title = "Display panes"
 command = ["perl", "display-panes.pl", "show"]
 
