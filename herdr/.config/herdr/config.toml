@@ -79,6 +79,8 @@ last_pane = "prefix+semicolon"   # tmux ; last-pane; unset in herdr by default
 # Literal `[` is required here, as with split_horizontal's `"` above:
 # `bracketleft`, `leftbracket`, `lbracket` and `openbracket` are all
 # rejected as invalid keybindings - named spellings don't cover every key.
+# prefix+] is a second copy mode, with relative line numbers - see the end of
+# this file.
 copy_mode = "prefix+["
 
 # herdr 0.9.0 has no pane-close confirmation of its own - confirm_close_pane,
@@ -218,6 +220,23 @@ key = "prefix+q"
 type = "plugin_action"
 command = "dotfiles.panes.display-panes"
 description = "display panes"
+
+# A copy mode with vim-style relative line numbers, so `5k` can be read off
+# the screen; herdr's own copy mode (prefix+[ above) cannot show them and
+# cannot be extended. The same plugin draws the focused pane in a full-size
+# popup, colours kept, the text pushed right of a number column, with vi
+# keys (counts, w/b/e, gg/G, / and ?, v/V/ctrl+v, y). Its history is read in
+# full when it opens and stays frozen. Claude and pi panes are on the
+# alternate screen, where herdr keeps no history, so for them it shows the
+# screen only. Prefix bindings work inside it: copy mode pauses, the binding
+# runs, and copy mode comes back when its pane gets focus again - except
+# bindings only herdr itself can run (workspace picker, Settings, navigate,
+# renames, resize, detach), which then need pressing again.
+[[keys.command]]
+key = "prefix+]"
+type = "plugin_action"
+command = "dotfiles.panes.copy-mode"
+description = "copy mode with line numbers"
 
 # plugins/panes/Panes.pm repaints pane borders and scrollbars with one-dark's
 # colours (%PALETTE there); change them too if this changes.

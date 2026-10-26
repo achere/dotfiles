@@ -70,7 +70,7 @@ done
 #    herdr/.config/herdr/plugins/numbering. Linking is idempotent, so this
 #    doubles as the update path, like the restow above.
 herdr plugin link "$HOME/.config/herdr/plugins/numbering"
-# The panes plugin (prefix+q, tmux display-panes) needs the
+# The panes plugin (prefix+q display-panes, prefix+] copy mode) needs the
 # same explicit link, for the same reason. It was called display-panes
 # before; a machine that linked that id gets it unlinked, and a machine that
 # never had it gets an error that is ignored.
