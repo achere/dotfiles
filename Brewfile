@@ -16,6 +16,10 @@ brew "stow"                         # bootstrap
 brew "go"                           # nvim go tooling; see bootstrap step 6
 brew "herdr"                        # herdr/.config/herdr/config.toml
 brew "jq"                           # herdr/.config/herdr/config.toml pane-close popup
+brew "aerc"                         # aerc/.config/aerc (mail client)
+brew "w3m"                          # aerc's default text/html filter
+brew "goimapnotify"                 # goimapnotify/.config/goimapnotify (brew service)
+brew "terminal-notifier"            # goimapnotify/.config/goimapnotify/mail-notify
 
 # --- explicitly requested ---
 brew "ripgrep"

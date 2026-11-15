@@ -1,0 +1,130 @@
+#!/usr/bin/python3
+"""Show a macOS notification for each new unread message in an IMAP INBOX.
+
+goimapnotify runs this when mail arrives, and once when it starts:
+
+    mail-notify HOST USER KEYCHAIN_ITEM
+
+It reads the password from the macOS Keychain item KEYCHAIN_ITEM, finds the
+unread messages with a UID above the last one it handled, and shows one
+notification each with terminal-notifier (at most 5, then one summary). The
+first run, and a run after the mailbox UIDVALIDITY changed, only records the
+current state, so old mail never floods the screen.
+
+State: ~/.local/state/mail-notify/KEYCHAIN_ITEM ("uidvalidity last-uid").
+Python 3.9 compatible (/usr/bin/python3 on macOS). Never prints the password.
+"""
+import email
+import email.policy
+import email.utils
+import fcntl
+import imaplib
+import os
+import re
+import ssl
+import subprocess
+import sys
+
+NOTIFIER = "/opt/homebrew/bin/terminal-notifier"
+MAX_SHOWN = 5
+
+
+def keychain_password(item):
+    out = subprocess.run(
+        ["/usr/bin/security", "find-generic-password", "-s", item, "-w"],
+        capture_output=True, text=True, check=True,
+    )
+    return out.stdout.rstrip("\n")
+
+
+def safe(text):
+    # terminal-notifier reads a value that starts with "-" or "[" as an option.
+    text = " ".join(text.split()) or "(none)"
+    return "\\" + text if text[0] in "-[" else text
+
+
+def notify(title, subtitle, message, group):
+    subprocess.run(
+        [NOTIFIER, "-title", safe(title), "-subtitle", safe(subtitle),
+         "-message", safe(message), "-group", group, "-sound", "default"],
+        check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+    )
+
+
+def read_state(path):
+    try:
+        with open(path) as f:
+            validity, uid = f.read().split()
+        return int(validity), int(uid)
+    except (OSError, ValueError):
+        return None
+
+
+def write_state(path, validity, uid):
+    tmp = path + ".tmp"
+    with open(tmp, "w") as f:
+        f.write("%d %d\n" % (validity, uid))
+    os.replace(tmp, path)
+
+
+def check(host, user, item, state_path):
+    imap = imaplib.IMAP4_SSL(host, ssl_context=ssl.create_default_context(), timeout=30)
+    try:
+        imap.login(user, keychain_password(item))
+        imap.select("INBOX", readonly=True)
+        validity = int(imap.response("UIDVALIDITY")[1][0])
+        uidnext = int(imap.response("UIDNEXT")[1][0])
+
+        state = read_state(state_path)
+        if state is None or state[0] != validity:
+            write_state(state_path, validity, uidnext - 1)
+            return
+        last = state[1]
+        if uidnext - 1 <= last:
+            return
+
+        # Only UIDs below the UIDNEXT seen at SELECT: a message that arrives
+        # during this run is left for the next run, so it is shown once.
+        _, data = imap.uid("SEARCH", None, "UID %d:* UNSEEN" % (last + 1))
+        uids = sorted(u for u in map(int, data[0].split()) if last < u < uidnext)
+        shown, extra = uids[-MAX_SHOWN:], len(uids) - MAX_SHOWN
+
+        if shown:
+            _, data = imap.uid(
+                "FETCH", ",".join(map(str, shown)),
+                "(BODY.PEEK[HEADER.FIELDS (FROM SUBJECT)])",
+            )
+            for part in data:
+                if not isinstance(part, tuple):
+                    continue
+                uid = re.search(rb"UID (\d+)", part[0])
+                msg = email.message_from_bytes(part[1], policy=email.policy.default)
+                name, addr = email.utils.parseaddr(str(msg.get("From", "")))
+                notify(name or addr, user, str(msg.get("Subject", "")) or "(no subject)",
+                       "mail-%s-%s" % (item, uid.group(1).decode() if uid else "?"))
+        if extra > 0:
+            notify("New mail", user, "and %d more unread messages" % extra, "mail-%s-more" % item)
+
+        write_state(state_path, validity, uidnext - 1)
+    finally:
+        try:
+            imap.logout()
+        except Exception:
+            pass
+
+
+def main():
+    if len(sys.argv) != 4:
+        sys.exit("usage: mail-notify HOST USER KEYCHAIN_ITEM")
+    host, user, item = sys.argv[1:]
+    state_dir = os.path.expanduser("~/.local/state/mail-notify")
+    os.makedirs(state_dir, exist_ok=True)
+    state_path = os.path.join(state_dir, item)
+    # goimapnotify can start a second run before the first one ends.
+    with open(state_path + ".lock", "w") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        check(host, user, item, state_path)
+
+
+if __name__ == "__main__":
+    main()

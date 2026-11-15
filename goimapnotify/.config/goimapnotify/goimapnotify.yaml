@@ -1,0 +1,19 @@
+# goimapnotify keeps an IMAP IDLE connection to INBOX and runs mail-notify
+# when mail arrives (and once at start; mail-notify ignores what it has seen).
+# Runs at login as a Homebrew service: brew services start goimapnotify
+# Log: /opt/homebrew/var/log/goimapnotify.log
+# Commands run with sh -c under launchd: PATH is only /usr/bin:/bin:..., so
+# use full paths. $HOME is set.
+configurations:
+  - host: mail.achere.dev
+    port: 993
+    tls: true
+    tlsOptions:
+      rejectUnauthorized: true
+      starttls: false
+    username: contact@achere.dev
+    passwordCMD: /usr/bin/security find-generic-password -s contact-achere-dev -w
+    boxes:
+      - mailbox: INBOX
+        onNewMail: $HOME/.config/goimapnotify/mail-notify mail.achere.dev contact@achere.dev contact-achere-dev
+        onNewMailPost: SKIP

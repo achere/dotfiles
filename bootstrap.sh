@@ -18,8 +18,9 @@ brew install stow
 #    ~/.config/lazygit would put lazygit's state into a public repo. The same
 #    applies to ~/.config/herdr, which holds herdr.sock, herdr-client.sock,
 #    session.json and .plugins.lock - live sockets and session state.
+#    aerc's :new-account wizard writes accounts.conf into ~/.config/aerc.
 mkdir -p "$HOME/.config/tmux" "$HOME/.config/kitty" "$HOME/.config/ghostty" \
-         "$HOME/.config/lazygit" "$HOME/.config/herdr"
+         "$HOME/.config/lazygit" "$HOME/.config/herdr" "$HOME/.config/aerc"
 
 # 4. link the packages
 cd "$DOTFILES"
@@ -29,11 +30,23 @@ cd "$DOTFILES"
 #    behind in ~/.config, dangling and invisible. -R clears those orphans. On a
 #    machine that has never been stowed the unstow half is a no-op, so this is
 #    also correct on a fresh install.
-stow -n -R -v tmux kitty ghostty zsh lazygit starship herdr git   # dry run first, always
-stow -R -v tmux kitty ghostty zsh lazygit starship herdr git
+stow -n -R -v tmux kitty ghostty zsh lazygit starship herdr git aerc goimapnotify   # dry run first, always
+stow -R -v tmux kitty ghostty zsh lazygit starship herdr git aerc goimapnotify
+#    aerc refuses an accounts.conf that group or others can read, and git
+#    checks files out as 0644. The file holds no secret (Keychain instead).
+chmod 600 "$DOTFILES/aerc/.config/aerc/accounts.conf"
 
 # 5. everything the configs depend on
 brew bundle install --file="$DOTFILES/Brewfile"
+
+#    New-mail notifications (goimapnotify -> mail-notify). It needs the mail
+#    password in the Keychain item contact-achere-dev; without it the service
+#    would only fail and restart, so start it only when the item exists.
+if security find-generic-password -s contact-achere-dev >/dev/null 2>&1; then
+  brew services start goimapnotify
+else
+  echo "skip goimapnotify: no Keychain item contact-achere-dev"
+fi
 
 # 6. Go tools for nvim's gopher.nvim (lua/custom/plugins/gopher.lua in the
 #    kickstart-modular.nvim repo). The plugin installs these itself, but only
