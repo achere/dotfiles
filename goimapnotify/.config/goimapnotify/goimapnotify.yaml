@@ -13,7 +13,16 @@ configurations:
       starttls: false
     username: contact@achere.dev
     passwordCMD: /usr/bin/security find-generic-password -s contact-achere-dev -w
+    # goimapnotify merges events that arrive together (new mail plus the
+    # flag change a client makes) and runs the command of only one of them.
+    # So every event runs mail-notify; it shows only unread mail it has not
+    # shown before, so extra runs are harmless. Set the commands per box:
+    # goimapnotify 2.6 ignores onChangedMail/onDeletedMail at account level.
     boxes:
       - mailbox: INBOX
         onNewMail: $HOME/.config/goimapnotify/mail-notify mail.achere.dev contact@achere.dev contact-achere-dev
+        onChangedMail: $HOME/.config/goimapnotify/mail-notify mail.achere.dev contact@achere.dev contact-achere-dev
+        onDeletedMail: $HOME/.config/goimapnotify/mail-notify mail.achere.dev contact@achere.dev contact-achere-dev
         onNewMailPost: SKIP
+        onChangedMailPost: SKIP
+        onDeletedMailPost: SKIP

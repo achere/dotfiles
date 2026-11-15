@@ -44,11 +44,15 @@ def safe(text):
 
 
 def notify(title, subtitle, message, group):
-    subprocess.run(
+    r = subprocess.run(
         [NOTIFIER, "-title", safe(title), "-subtitle", safe(subtitle),
          "-message", safe(message), "-group", group, "-sound", "default"],
-        check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        check=False, capture_output=True, text=True,
     )
+    if r.returncode != 0:
+        # Exit 3: notifications are off for terminal-notifier in System
+        # Settings. goimapnotify copies this to its log.
+        print("terminal-notifier exit %d: %s" % (r.returncode, " ".join(r.stdout.split())))
 
 
 def read_state(path):
