@@ -47,6 +47,9 @@ if security find-generic-password -s contact-achere-dev >/dev/null 2>&1; then
 else
   echo "skip goimapnotify: no Keychain item contact-achere-dev"
 fi
+#    mailto: links open a composer in aerc: build ~/Applications/Aerc
+#    Mailto.app from apps/aerc-mailto/ and make it the mailto: handler.
+"$DOTFILES/apps/aerc-mailto/build.sh"
 
 # 6. Go tools for nvim's gopher.nvim (lua/custom/plugins/gopher.lua in the
 #    kickstart-modular.nvim repo). The plugin installs these itself, but only

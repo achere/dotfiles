@@ -1,0 +1,166 @@
+#!/usr/bin/python3
+"""Open a mailto: link in aerc. Aerc Mailto.app, the macOS handler for
+mailto: links (built by apps/aerc-mailto/build.sh in ~/dotfiles), runs:
+
+    mailto-aerc 'mailto:someone@example.com?subject=Hi'
+    mailto-aerc            (app opened without a link: show aerc)
+
+1. If no aerc runs, start one in a new herdr tab "mail" and wait for its
+   IPC socket.
+2. Send the link to aerc over its IPC socket (`aerc mailto:...`); aerc
+   opens a composer tab.
+3. Focus the herdr pane that runs aerc and bring Ghostty to the front.
+
+A link can come from any web page. Only the address and the query keys
+subject, body, cc, bcc and in-reply-to go to aerc. aerc also reads
+template= (a file path; aerc templates can run commands, so a link plus a
+downloaded file could run code) and account=: those and all other keys are
+dropped.
+
+Runs under LaunchServices: no PATH, so full paths only. aerc needs
+XDG_CONFIG_HOME, or it reads (and fills with defaults)
+~/Library/Preferences/aerc instead of ~/.config/aerc. Errors go to stderr
+(the app appends it to ~/Library/Logs/aerc-mailto.log) and to a
+notification. Python 3.9 compatible (/usr/bin/python3 on macOS).
+"""
+import json
+import os
+import socket
+import subprocess
+import sys
+import time
+import urllib.parse
+
+HOME = os.path.expanduser("~")
+AERC = "/opt/homebrew/bin/aerc"
+HERDR = "/opt/homebrew/bin/herdr"
+NOTIFIER = "/opt/homebrew/bin/terminal-notifier"
+AERC_SOCK = os.path.join(HOME, "Library/Application Support/aerc.sock")
+HERDR_SOCK = os.path.join(HOME, ".config/herdr/herdr.sock")
+GHOSTTY = "com.mitchellh.ghostty"
+KEEP = ("subject", "body", "cc", "bcc", "in-reply-to")
+START_TIMEOUT = 30  # seconds; aerc reads the Keychain and logs in first
+
+
+def clean(url):
+    """Return the link as aerc must get it. Raise ValueError if it is not
+    a mailto: link."""
+    scheme, sep, rest = url.strip().partition(":")
+    if not sep or scheme.lower() != "mailto":
+        raise ValueError("not a mailto: link: %r" % url)
+    addr, _, query = rest.partition("?")
+    to = [urllib.parse.unquote(addr)]
+    keep = []
+    for part in query.split("&"):
+        key, _, value = part.partition("=")
+        key = urllib.parse.unquote(key).strip().lower()
+        if key == "to":  # RFC 6068 allows it; aerc reads only the address part
+            to.append(urllib.parse.unquote(value))
+        elif key in KEEP:
+            keep.append(key + "=" + value)  # aerc decodes query values itself
+    # aerc reads the address part without percent-decoding, up to the first
+    # "?". So decode it here, keep "?" encoded and drop control characters.
+    address = ",".join(a for a in to if a.strip())
+    address = "".join(c for c in address if c >= " " and c != "\x7f")
+    address = address.replace("?", "%3F")
+    return "mailto:" + address + ("?" + "&".join(keep) if keep else "")
+
+
+def listening(path):
+    s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    s.settimeout(2)
+    try:
+        s.connect(path)
+        return True
+    except OSError:
+        return False
+    finally:
+        s.close()
+
+
+def herdr(method, **params):
+    """One request to herdr's socket API (the CLI has no pane focus by ID)."""
+    s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    s.settimeout(5)
+    try:
+        s.connect(HERDR_SOCK)
+        request = {"id": "mailto-aerc", "method": method, "params": params}
+        s.sendall((json.dumps(request) + "\n").encode())
+        buf = b""
+        while not buf.endswith(b"\n"):
+            chunk = s.recv(65536)
+            if not chunk:
+                break
+            buf += chunk
+    finally:
+        s.close()
+    reply = json.loads(buf)
+    if "result" not in reply:
+        raise RuntimeError("herdr %s: %s" % (method, reply.get("error", reply)))
+    return reply["result"]
+
+
+def start_aerc():
+    if not listening(HERDR_SOCK):
+        raise RuntimeError("aerc and herdr are not running; start herdr, then click the link again")
+    tab = herdr("tab.create", cwd=HOME, label="mail", focus=True)
+    pane = tab["root_pane"]["pane_id"]
+    # The pane runs the login shell, which sets XDG_CONFIG_HOME. With exec,
+    # the tab closes when aerc quits.
+    subprocess.run([HERDR, "pane", "run", pane, "exec aerc"],
+                   check=True, capture_output=True, timeout=10)
+    deadline = time.time() + START_TIMEOUT
+    while time.time() < deadline:
+        if listening(AERC_SOCK):
+            return
+        time.sleep(0.5)
+    raise RuntimeError("aerc did not open its socket within %d s (herdr pane %s)"
+                       % (START_TIMEOUT, pane))
+
+
+def send_to_aerc(url):
+    # Call only while aerc's socket listens: when the IPC send fails, aerc
+    # starts its own UI instead, which fails without a terminal.
+    env = dict(os.environ, XDG_CONFIG_HOME=os.path.join(HOME, ".config"))
+    r = subprocess.run([AERC, url], env=env, stdin=subprocess.DEVNULL,
+                       capture_output=True, text=True, timeout=15)
+    if r.returncode != 0:
+        raise RuntimeError("aerc exit %d: %s" % (r.returncode, r.stderr.strip()[-500:]))
+
+
+def show_aerc():
+    """Focus the herdr pane that runs aerc, then Ghostty. Best effort."""
+    try:
+        for pane in herdr("pane.list")["panes"]:
+            info = herdr("pane.process_info", pane_id=pane["pane_id"])["process_info"]
+            if any(p.get("name") == "aerc" for p in info.get("foreground_processes", [])):
+                herdr("pane.focus", pane_id=pane["pane_id"])
+                break
+    except (OSError, ValueError, KeyError, RuntimeError) as e:
+        print("mailto-aerc: cannot focus aerc in herdr: %s" % e, file=sys.stderr)
+    subprocess.run(["/usr/bin/open", "-b", GHOSTTY], check=False)
+
+
+def notify(message):
+    subprocess.run([NOTIFIER, "-title", "Aerc Mailto", "-message", message],
+                   check=False, capture_output=True)
+
+
+def main():
+    if len(sys.argv) > 2:
+        sys.exit("usage: mailto-aerc [MAILTO_URL]")
+    try:
+        url = clean(sys.argv[1]) if len(sys.argv) == 2 else None
+        if not listening(AERC_SOCK):
+            start_aerc()
+        if url:
+            send_to_aerc(url)
+        show_aerc()
+    except Exception as e:
+        print("mailto-aerc: %s" % e, file=sys.stderr)
+        notify(str(e)[:200])
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()
