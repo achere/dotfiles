@@ -156,9 +156,14 @@ moves still goes to the old pane, as with any plugin binding.
 
 ## Follow-up
 
-After the user approves the dotfiles version, port it to
-`~/Code/personal/herdr-tmuxify`: the same plugin code and bindings, through
-that repo's installer, uninstaller, tests and README.
+Ported to `~/Code/personal/herdr-tmuxify` on 2026-11-19, with the rest of
+this `panes` plugin except copy mode (still experimental here). There it is
+`herdr-tmuxify.panes`, replacing that repo's standalone `display-panes`
+plugin, whose id install and uninstall now unlink. Differences from this
+version: with no copy mode to share a hook with, the `pane.focused` hook is
+`focus.pl focused`; `Panes.pm` keeps that repo's per-theme colours and XDG
+config path; the bindings are fragments (`keys.toml` unbinds
+`focus_pane_*`, `commands.toml` blocks require those scalars).
 
 ## Out of scope
 
