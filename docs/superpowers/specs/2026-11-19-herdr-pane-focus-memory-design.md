@@ -1,7 +1,24 @@
 # herdr pane focus memory (tmux's directional pick) — design
 
 **Date:** 2026-11-19
-**Status:** proposed
+**Status:** implemented 2026-11-19 — `plugins/panes/focus.pl`, the store and
+`direction_target` in `Panes.pm`, the copy-mode changes, the four actions in
+the manifest, the `prefix+h/j/k/l` bindings in `config.toml`. Approved by
+the user on their live herdr the same day.
+
+Verified by an agent against an isolated herdr 0.9.5 server (`env -i`, a
+throwaway HOME, the panes plugin linked; the script is throwaway, not in the
+repo), the actions invoked through `herdr plugin action invoke`:
+- in the 1 | 2/3 tab: `[3] h → 1 → l → 3`, `[2] h → 1 → l → 2`,
+  `[2] j → 3`; with no records `[1] l → 2` (herdr's pick, the old behaviour);
+- focus moved by `pane.focus` alone (the hook's records only): 3, then 1,
+  then `l → 3`;
+- copy mode's `context()` from the live snapshot and records plans
+  `pane.focus` on 3 for `prefix+l` from 1;
+- a closed pane leaves `stamps` on the next write;
+- `focus.pl` per press, start to exit: median ~17 ms.
+`perl focus.t`, `perl copy-mode.t` and `perl display-panes.t` cover the pure
+layer.
 
 ## Goal
 

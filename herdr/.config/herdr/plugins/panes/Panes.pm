@@ -11,14 +11,15 @@ use strict;
 use warnings;
 use utf8;
 use Exporter 'import';
+use Fcntl qw(:flock);
 use IO::Select;
 use Socket qw(AF_UNIX SOCK_STREAM pack_sockaddr_un);
 use Time::HiRes qw(time);
 
 our @EXPORT = qw(
-  %PALETTE layout scrollbar_thumb frame_start pane_lines pane_chrome frame_end
-  api fence marker drop_marker marked wait_marker pane_text open_after_render
-  make_state remove_state write_file read_lines json
+  %PALETTE layout direction_target stamps_after focus_call scrollbar_thumb frame_start pane_lines pane_chrome
+  frame_end api fence marker drop_marker marked wait_marker pane_text open_after_render
+  session_dir read_stamps stamp make_state remove_state write_file read_lines json
 );
 
 my $JSON = eval { require JSON::XS; JSON::XS->new->utf8 }
@@ -81,10 +82,67 @@ sub layout {
                     max     => $m->{max_offset_from_bottom} // 0,
                     off     => $m->{offset_from_bottom} // 0,
                     vp      => $m->{viewport_rows} // 0,
+                    rect    => $r,
                 };
             } @panes
         ],
     };
+}
+
+# prefix+h/j/k/l the tmux way: of the panes next to $from towards $dir, the
+# one focused last ($stamps: pane id => time). herdr ranks them by edge
+# distance, then overlap, then layout order (find_in_direction,
+# src/layout.rs), so from a full-height pane two stacked neighbours always
+# tie and the top one wins. The candidates are herdr's - beyond that edge,
+# overlapping $from along it - cut to the nearest. undef lets herdr decide:
+# a zoomed tab, fewer than two candidates, or none of them with a record.
+sub direction_target {
+    my ($lay, $from, $dir, $stamps) = @_;
+    return undef if $lay->{zoomed};
+    my ($f) = grep { $_->{id} eq $from } @{ $lay->{panes} } or return undef;
+    my $fr = $f->{rect};
+    my $across = $dir eq 'left' || $dir eq 'right';
+    # The gap from $from's edge to a pane that way, or undef if it is not one.
+    my $gap = sub {
+        my ($r) = @_;
+        my ($at, $len) = $across ? ('y', 'height') : ('x', 'width');
+        return undef unless $r->{$at} < $fr->{$at} + $fr->{$len} && $r->{$at} + $r->{$len} > $fr->{$at};
+        my $d = $dir eq 'left'  ? $fr->{x} - ($r->{x} + $r->{width})
+              : $dir eq 'right' ? $r->{x} - ($fr->{x} + $fr->{width})
+              : $dir eq 'up'    ? $fr->{y} - ($r->{y} + $r->{height})
+              :                   $r->{y} - ($fr->{y} + $fr->{height});
+        return $d >= 0 ? $d : undef;
+    };
+    my ($min, @near);
+    for my $p (grep { $_->{id} ne $from } @{ $lay->{panes} }) {
+        my $d = $gap->($p->{rect}) // next;
+        if (!defined $min || $d < $min) { $min = $d; @near = ($p) }
+        elsif ($d == $min)              { push @near, $p }
+    }
+    return undef if @near < 2;
+    my $best;
+    for my $p (grep { defined $stamps->{ $_->{id} } } @near) {
+        $best = $p if !$best || $stamps->{ $p->{id} } > $stamps->{ $best->{id} };
+    }
+    return $best ? $best->{id} : undef;
+}
+
+# The focus records after @panes got focus, in that order, at $now. Panes
+# missing from %$live have closed and are dropped.
+sub stamps_after {
+    my ($old, $live, $now, @panes) = @_;
+    my %t = map { ($_ => $old->{$_}) } grep { $live->{$_} } keys %$old;
+    $t{ $panes[$_] } = $now + $_ / 1000 for 0 .. $#panes;
+    return \%t;
+}
+
+# The request that moves focus from $from towards $dir.
+sub focus_call {
+    my ($lay, $from, $dir, $stamps) = @_;
+    my $to = direction_target($lay, $from, $dir, $stamps);
+    return defined $to
+      ? ['pane.focus', { pane_id => $to }]
+      : ['pane.focus_direction', { pane_id => $from, direction => $dir }];
 }
 
 # The scrollbar thumb as (top, length) in track rows, or () when the pane
@@ -245,6 +303,37 @@ sub open_after_render {
     fence($pane) unless wait_marker($m, $pane);
     drop_marker($m);
     return api('plugin.pane.open', { plugin_id => PLUGIN_ID, entrypoint => $entry, env => $env });
+}
+
+# This plugin's state for one herdr session: copy mode's paused views and
+# focus history, and the focus records direction_target reads. Keyed by the
+# session's socket: the plugin's state dir is one for all sessions
+# (plugin_state_dir, src/plugin_paths.rs), and pane ids repeat across them.
+sub session_dir {
+    (my $key = $ENV{HERDR_SOCKET_PATH} // 'default') =~ s/[^\w.-]/_/g;
+    return ($ENV{HERDR_PLUGIN_STATE_DIR} // $ENV{TMPDIR} // '/tmp') . "/$key";
+}
+
+# The focus records, pane id => time. Read without the lock: a write lands
+# whole, by rename.
+sub read_stamps {
+    my %t = map { /\A([^\t]+)\t([\d.]+)\z/ ? ($1, $2) : () } read_lines(session_dir() . '/stamps');
+    return \%t;
+}
+
+# Record that @panes got focus, in that order. $live is the set of panes the
+# snapshot still has. Both writers - the pane.focused hook and the focus
+# action - read and write the whole file, so the lock keeps one from undoing
+# the other's write.
+sub stamp {
+    my ($live, @panes) = @_;
+    my $dir = session_dir();
+    mkdir $dir, 0700;
+    open my $lock, '>', "$dir/stamps.lock" or return;
+    flock $lock, LOCK_EX or return;
+    my $t = stamps_after(read_stamps(), $live, time, @panes);
+    write_file("$dir/stamps.$$", join '', map { "$_\t" . sprintf('%.3f', $t->{$_}) . "\n" } sort keys %$t);
+    rename "$dir/stamps.$$", "$dir/stamps";
 }
 
 # A state dir for one run, and its removal.

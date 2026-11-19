@@ -906,8 +906,13 @@ sub plan_binding {
     if (defined $bind->{type}) {
         return { run => $bind->{command} } if $bind->{type} eq 'popup';
         if ($bind->{type} eq 'plugin_action' && $bind->{command} =~ /\A(.+)\.([^.]+)\z/) {
-            return { self => 1 } if $1 eq Panes::PLUGIN_ID && $2 eq 'copy-mode';
-            return { plugin => [$1, $2] };
+            my ($plugin, $action) = ($1, $2);
+            if ($plugin eq Panes::PLUGIN_ID) {
+                return { self => 1 } if $action eq 'copy-mode';
+                return { calls => [focus_call($ctx->{layout}, $pane, $1, $ctx->{stamps})] }
+                  if $action =~ /\Afocus-(left|down|up|right)\z/;
+            }
+            return { plugin => [$plugin, $action] };
         }
         return { pause => 1 };
     }
@@ -1113,13 +1118,9 @@ sub geometry_lay { my ($m) = @_; return { rows => $m->{lay_rows}, cols => $m->{l
 
 # --- pausing: files ---------------------------------------------------------
 
-# Paused views and the focus history are kept per herdr session, by its
-# socket: the plugin's state dir is one for all sessions
-# (plugin_state_dir, src/plugin_paths.rs), and pane ids repeat across them.
-my $SESSION_DIR = do {
-    (my $key = $ENV{HERDR_SOCKET_PATH} // 'default') =~ s/[^\w.-]/_/g;
-    ($ENV{HERDR_PLUGIN_STATE_DIR} // $ENV{TMPDIR} // '/tmp') . "/$key";
-};
+# Paused views and the focus history are kept per herdr session (see
+# session_dir in Panes.pm).
+my $SESSION_DIR = session_dir();
 
 sub paused_path {
     my ($pane) = @_;
@@ -1266,6 +1267,9 @@ sub on_focused {
     my $s = (api('session.snapshot', {}) // return)->{snapshot};
     my %live = map { $_->{pane_id} => 1 } map { @{ $_->{panes} } } @{ $s->{layouts} };
     return unless $live{$pane};
+    # The record prefix+h/j/k/l pick by (focus.pl). A failed write must not
+    # stop a paused copy mode from coming back.
+    eval { stamp(\%live, $pane) };
     my %live_file = map { paused_path($_) => 1 } keys %live;
     unlink grep { !$live_file{$_} } glob "$SESSION_DIR/paused/*.json";
 
@@ -1310,6 +1314,8 @@ sub context {
                         grep { $_->{workspace_id} eq ($p->{workspace_id} // '') } @{ $s->{tabs} // [] } ],
         workspaces => [ map { +{ id => $_->{workspace_id}, number => $_->{number} } } @{ $s->{workspaces} // [] } ],
         last_pane  => defined $last && $last ne '' && $last ne $pane ? $last : undef,
+        layout     => $l ? layout({ %$s, focused_tab_id => $l->{tab_id} }, 1) : { panes => [] },
+        stamps     => read_stamps(),
     };
 }
 

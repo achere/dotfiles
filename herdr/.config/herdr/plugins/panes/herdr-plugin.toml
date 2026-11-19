@@ -1,6 +1,7 @@
-# herdr panes plugin: tmux's `prefix q` (display-panes) and a copy mode with
-# relative line numbers (prefix+]). Both open a full-size popup that repaints
-# the panes underneath, and that frame must be built before the popup opens
+# herdr panes plugin: tmux's `prefix q` (display-panes), a copy mode with
+# relative line numbers (prefix+]), and tmux's prefix+h/j/k/l, which go back
+# to the neighbour focused last. The first two open a full-size popup that
+# repaints the panes underneath, and that frame must be built before it opens
 # (see the header of display-panes.pl) - so a plugin rather than a plain
 # `type = "popup"` keybinding: only a plugin can open a popup from a script,
 # there is no API to open one with an arbitrary command.
@@ -11,7 +12,7 @@ id = "dotfiles.panes"
 name = "Panes"
 version = "0.2.0"
 min_herdr_version = "0.9.1"
-description = "tmux display-panes, and a copy mode with relative line numbers"
+description = "tmux display-panes, a copy mode with relative line numbers, and tmux's pane focus by direction"
 platforms = ["macos"]
 
 # Bound to prefix+q in config.toml.
@@ -26,10 +27,31 @@ id = "copy-mode"
 title = "Copy mode with line numbers"
 command = ["perl", "copy-mode.pl", "open"]
 
+# Bound to prefix+h/j/k/l in config.toml: to the neighbour focused last.
+[[actions]]
+id = "focus-left"
+title = "Focus pane left"
+command = ["perl", "focus.pl", "left"]
+
+[[actions]]
+id = "focus-down"
+title = "Focus pane down"
+command = ["perl", "focus.pl", "down"]
+
+[[actions]]
+id = "focus-up"
+title = "Focus pane up"
+command = ["perl", "focus.pl", "up"]
+
+[[actions]]
+id = "focus-right"
+title = "Focus pane right"
+command = ["perl", "focus.pl", "right"]
+
 # Copy mode pauses when a prefix binding takes focus elsewhere; this reopens
 # it when its pane gets focus back (and keeps the focus history last_pane
-# needs). It runs on every focus change and exits at once when there is
-# nothing paused to reopen.
+# needs, and the focus records prefix+h/j/k/l pick by). It runs on every
+# focus change and exits at once when there is nothing paused to reopen.
 [[events]]
 on = "pane.focused"
 command = ["perl", "copy-mode.pl", "focused"]

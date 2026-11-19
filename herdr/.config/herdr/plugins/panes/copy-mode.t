@@ -387,6 +387,25 @@ is_deeply plan_of({ type => 'popup', command => 'x' }), { run => 'x' }, 'a custo
 is_deeply plan_of({ type => 'plugin_action', command => 'dotfiles.panes.display-panes' }),
   { plugin => ['dotfiles.panes', 'display-panes'] }, 'a plugin action';
 is_deeply plan_of({ type => 'plugin_action', command => 'dotfiles.panes.copy-mode' }), { self => 1 }, 'prefix+] itself';
+{
+    # 1 on the left, 2 top right, 3 bottom right; copy mode open in 1.
+    my $snap = {
+        focused_tab_id => 'w1:t1', focused_pane_id => 'w1:p1',
+        layouts => [{ tab_id => 'w1:t1', zoomed => 0, area => { x => 0, y => 0, width => 165, height => 48 }, panes => [
+            { pane_id => 'w1:p1', focused => 1, rect => { x => 0,  y => 0,  width => 83, height => 48 } },
+            { pane_id => 'w1:p2', focused => 0, rect => { x => 83, y => 0,  width => 82, height => 24 } },
+            { pane_id => 'w1:p3', focused => 0, rect => { x => 83, y => 24, width => 82, height => 24 } },
+        ] }],
+    };
+    my $in_p1 = { %$ctx, pane => 'w1:p1', layout => layout($snap, 1), stamps => { 'w1:p3' => 2, 'w1:p2' => 1 } };
+    my $right = { type => 'plugin_action', command => 'dotfiles.panes.focus-right' };
+    is_deeply plan_of($right, $in_p1), { calls => [['pane.focus', { pane_id => 'w1:p3' }]] },
+      'prefix+l: to the neighbour focused last, without leaving this process';
+    is_deeply plan_of($right, { %$in_p1, stamps => {} }),
+      { calls => [['pane.focus_direction', { pane_id => 'w1:p1', direction => 'right' }]] }, '... herdr decides without records';
+    is_deeply plan_of({ type => 'plugin_action', command => 'other.plugin.focus-right' }, $in_p1),
+      { plugin => ['other.plugin', 'focus-right'] }, "another plugin's action of that name stays a plugin action";
+}
 is_deeply plan_of({ type => 'pane', command => 'x' }), { pause => 1 }, 'other custom commands: pause';
 
 # --- pausing ----------------------------------------------------------------

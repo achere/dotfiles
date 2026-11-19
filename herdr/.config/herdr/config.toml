@@ -73,6 +73,17 @@ switch_workspace = "prefix+shift+1..9"
 
 last_pane = "prefix+semicolon"   # tmux ; last-pane; unset in herdr by default
 
+# prefix+h/j/k/l move to the pane on that side, as herdr's defaults do, but
+# pick the way tmux does when two panes are on that side: the one focused
+# last. herdr picks the first in layout order, so from a full-height pane
+# beside a stacked pair it always lands on the top one, wherever you came
+# from. Unbound here, rebound to the panes plugin at the end of this file.
+# NAVIGATE mode's h/j/k/l and arrows keep herdr's pick.
+focus_pane_left  = ""
+focus_pane_down  = ""
+focus_pane_up    = ""
+focus_pane_right = ""
+
 # tmux `prefix [` enters copy mode; herdr's copy mode has the same vi-style
 # motions built in. Easy to miss: this action is absent from herdr
 # --default-config output, which makes it look unsupported when it isn't.
@@ -237,6 +248,34 @@ key = "prefix+]"
 type = "plugin_action"
 command = "dotfiles.panes.copy-mode"
 description = "copy mode with line numbers"
+
+# prefix+h/j/k/l, unbound from herdr's focus_pane_* above: the neighbour on
+# that side focused last, tmux's rule (plugins/panes/focus.pl). With one
+# neighbour, none with a record, or a zoomed tab, herdr picks as before. See
+# docs/superpowers/specs/2026-11-19-herdr-pane-focus-memory-design.md.
+[[keys.command]]
+key = "prefix+h"
+type = "plugin_action"
+command = "dotfiles.panes.focus-left"
+description = "focus pane left"
+
+[[keys.command]]
+key = "prefix+j"
+type = "plugin_action"
+command = "dotfiles.panes.focus-down"
+description = "focus pane down"
+
+[[keys.command]]
+key = "prefix+k"
+type = "plugin_action"
+command = "dotfiles.panes.focus-up"
+description = "focus pane up"
+
+[[keys.command]]
+key = "prefix+l"
+type = "plugin_action"
+command = "dotfiles.panes.focus-right"
+description = "focus pane right"
 
 # plugins/panes/Panes.pm repaints pane borders and scrollbars with one-dark's
 # colours (%PALETTE there); change them too if this changes.
