@@ -26,3 +26,9 @@ macos-option-as-alt = true
 
 # More line spacing.
 adjust-cell-height = 20%
+
+# Option+Space in any app brings Ghostty to the front; in Ghostty it hides
+# Ghostty. No kitty counterpart: kitty has no system-wide hotkeys.
+# global: keybinds need Ghostty allowed in System Settings → Privacy &
+# Security → Accessibility.
+keybind = global:alt+space=toggle_visibility
